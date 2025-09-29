@@ -8,6 +8,11 @@ variable "region" {
   description = "Region for resources"
 }
 
+variable "bucket_name" {
+  type        = string
+  description = "Nom du bucket"
+}
+
 variable "network_name" {
   type        = string
   description = "Name of the VPC"
