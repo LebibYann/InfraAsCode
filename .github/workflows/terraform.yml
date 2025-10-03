@@ -14,9 +14,6 @@ jobs:
       matrix:
         env: [dev, prd]
 
-    env:
-      GOOGLE_APPLICATION_CREDENTIALS: ${HOME}/gcp-creds.json
-
     steps:
       - uses: actions/checkout@v3
 
@@ -32,6 +29,7 @@ jobs:
           SECRET_NAME="GOOGLE_CREDENTIAL_${ENV_UPPER}"
           echo "${!SECRET_NAME}" > $HOME/gcp-creds.json
           chmod 600 $HOME/gcp-creds.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-creds.json" >> $GITHUB_ENV
 
       - name: Init
         run: terraform init -backend-config=backends/${{ matrix.env }}.config
