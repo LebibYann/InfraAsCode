@@ -12,11 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - env: dev
-            google_cred: ${{ secrets.GOOGLE_CREDENTIAL_DEV }}
-          - env: prd
-            google_cred: ${{ secrets.GOOGLE_CREDENTIAL_PRD }}
+        env: [dev, prd]
+
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
 
     steps:
       - uses: actions/checkout@v3
@@ -25,13 +24,16 @@ jobs:
         uses: hashicorp/setup-terraform@v2
 
       - name: Setup GCP credentials
+        env:
+          GOOGLE_CREDENTIAL_DEV: ${{ secrets.GOOGLE_CREDENTIAL_DEV }}
+          GOOGLE_CREDENTIAL_PRD: ${{ secrets.GOOGLE_CREDENTIAL_PRD }}
         run: |
-          echo '${{ matrix.google_cred }}' > $HOME/gcp-creds.json
-
+          ENV_UPPER=$(echo "${{ matrix.env }}" | tr '[:lower:]' '[:upper:]')
+          SECRET_NAME="GOOGLE_CREDENTIAL_${ENV_UPPER}"
+          echo "${!SECRET_NAME}" > $HOME/gcp-creds.json
+          chmod 600 $HOME/gcp-creds.json
 
       - name: Init
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
         run: terraform init -backend-config=backends/${{ matrix.env }}.config
 
       - name: Format & Validate
@@ -40,8 +42,6 @@ jobs:
           terraform validate
 
       - name: Plan
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
         run: terraform plan -var-file=${{ matrix.env }}.tfvars
 
       - name: Apply (on tag only)
