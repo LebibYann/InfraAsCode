@@ -12,7 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        env: [dev, prd]
+        include:
+          - env: dev
+            google_cred: ${{ secrets.GOOGLE_CREDENTIAL_DEV }}
+          - env: prd
+            google_cred: ${{ secrets.GOOGLE_CREDENTIAL_PRD }}
 
     steps:
       - uses: actions/checkout@v3
@@ -21,7 +25,9 @@ jobs:
         uses: hashicorp/setup-terraform@v2
 
       - name: Setup GCP credentials
-        run: echo '${{ secrets["GOOGLE_CREDENTIAL_${{ matrix.env | upper }}"] }}' > $HOME/gcp-creds.json
+        run: |
+          echo '${{ matrix.google_cred }}' > $HOME/gcp-creds.json
+
 
       - name: Init
         env:
