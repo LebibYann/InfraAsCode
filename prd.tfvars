@@ -1,0 +1,5 @@
+project_id   = "lenny-iac-prd"
+region       = "europe-west1"
+network_name = "student-vpc"
+subnet_cidr  = "10.0.0.0/24"
+bucket_name  = "iac-tek-bucket-prd"
