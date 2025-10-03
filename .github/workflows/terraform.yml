@@ -14,9 +14,6 @@ jobs:
       matrix:
         env: [dev, prd]
 
-    env:
-      GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
-
     steps:
       - uses: actions/checkout@v3
 
@@ -34,6 +31,8 @@ jobs:
           chmod 600 $HOME/gcp-creds.json
 
       - name: Init
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
         run: terraform init -backend-config=backends/${{ matrix.env }}.config
 
       - name: Format & Validate
@@ -42,8 +41,12 @@ jobs:
           terraform validate
 
       - name: Plan
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
         run: terraform plan -var-file=${{ matrix.env }}.tfvars
 
       - name: Apply (on tag only)
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
         run: terraform apply -auto-approve -var-file=${{ matrix.env }}.tfvars
