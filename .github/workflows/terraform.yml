@@ -2,7 +2,7 @@ name: Terraform CI/CD
 
 on:
   push:
-    branches: [**]
+    branches: ["**"]
     tags: ['v*']
   pull_request:
     branches: [main]
