@@ -19,3 +19,9 @@ How to destroy:
 ```
 terraform destroy -var-file="dev.tfvars"
 ```
+
+### OIDC Setup
+
+```bash
+gcloud iam workload-identity-pools providers describe github-provider --workload-identity-pool="github-pool" --location="global" --format="value(name)"
+```

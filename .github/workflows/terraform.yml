@@ -7,13 +7,29 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  id-token: write   # For OIDC
+  contents: read
+
+env:
+  PRD_ENV_NAME: prd
+  MAIN_BRANCH_REF: refs/heads/main
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    # Only include `prd` in the matrix when the run is on the main branch.
+    # Matrix contains environments; we'll guard steps so `prd` steps only run on main.
     strategy:
       matrix:
-        env: ${{ fromJson(github.ref == 'refs/heads/main' && '["dev","prd"]' || '["dev"]') }}
+        include:
+          - env: dev
+            workload_identity_provider: projects/659049800117/locations/global/workloadIdentityPools/github-pool-ci
+            service_account: terraform-bot-dev@infra-as-code-tek.iam.gserviceaccount.com
+            project_id: infra-as-code-tek
+          - env: prd
+            workload_identity_provider: to_set
+            service_account: to_set
+            project_id: lenny-iac-prd
 
     steps:
       - uses: actions/checkout@v3
@@ -21,42 +37,33 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
 
-      - name: Setup GCP credentials
-        env:
-          GOOGLE_CREDENTIAL_DEV: ${{ secrets.GOOGLE_CREDENTIAL_DEV }}
-          GOOGLE_CREDENTIAL_PRD: ${{ secrets.GOOGLE_CREDENTIAL_PRD }}
-        run: |
-          ENV_UPPER=$(echo "${{ matrix.env }}" | tr '[:lower:]' '[:upper:]')
-          SECRET_NAME="GOOGLE_CREDENTIAL_${ENV_UPPER}"
-          echo "${!SECRET_NAME}" > $HOME/gcp-creds.json
-          chmod 600 $HOME/gcp-creds.json
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-creds.json" >> $GITHUB_ENV
-          echo "PROJECT_ID=$(cat $HOME/gcp-creds.json | jq -r .project_id)" >> $GITHUB_ENV
-          echo "CLIENT_EMAIL=$(cat $HOME/gcp-creds.json | jq -r .client_email)" >> $GITHUB_ENV
+      - name: Authenticate to Google Cloud
+        if: ${{ matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ matrix.workload_identity_provider }}
+          service_account: ${{ matrix.service_account }}
 
-      - name: Display GCP Project Info
-        run: |
-          echo $GOOGLE_APPLICATION_CREDENTIALS
-          echo $CLIENT_EMAIL
-          echo $PROJECT_ID
-
-      - name: Connect to GCP
-        run: |
-          gcloud auth activate-service-account --key-file=$HOME/gcp-creds.json
-          gcloud config set project $PROJECT_ID
-
+      - name: Setup gcloud CLI
+        if: ${{ matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF }}
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ matrix.project_id }}
 
       - name: Init
+        if: ${{ matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF }}
         run: terraform init -backend-config="./init.config"
 
       - name: Format & Validate
+        if: ${{ matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF }}
         run: |
           terraform fmt -check
           terraform validate
 
       - name: Plan
+        if: ${{ matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF }}
         run: terraform plan -var-file=${{ matrix.env }}.tfvars
 
       - name: Apply (on tag only)
-        if: startsWith(github.ref, 'refs/tags/')
+        if: ${{ (matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF) && startsWith(github.ref, 'refs/tags/') }}
         run: terraform apply -auto-approve -var-file=${{ matrix.env }}.tfvars

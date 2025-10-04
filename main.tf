@@ -35,6 +35,9 @@ resource "google_project_service" "enabled" {
   disable_on_destroy = true
 }
 
+# -----------------------------
+# Services
+# -----------------------------
 resource "google_compute_network" "gpc_vpc" {
   name                    = "test-network"
   auto_create_subnetworks = false
