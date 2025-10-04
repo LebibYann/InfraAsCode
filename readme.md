@@ -86,3 +86,10 @@ gcloud iam service-accounts add-iam-policy-binding terraform-ci-dev@your_gcp_pro
   with:
     project_id: your_gcp_project_id
 ```
+
+#### 8 Troubleshooting
+You might to also enable this service:
+> Make sure to replace `your_gcp_project_id` with your actual GCP project ID.
+```
+gcloud services enable compute.googleapis.com --project your_gcp_project_id
+```
