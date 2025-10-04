@@ -31,6 +31,9 @@ jobs:
           echo "${!SECRET_NAME}" > $HOME/gcp-creds.json
           chmod 600 $HOME/gcp-creds.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-creds.json" >> $GITHUB_ENV
+
+      - name: Display GCP Project Info
+        run: |
           echo $GOOGLE_APPLICATION_CREDENTIALS
           cat $GOOGLE_APPLICATION_CREDENTIALS | jq '.client_email, .project_id'
 
