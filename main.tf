@@ -18,7 +18,7 @@ provider "google" {
 # Service enabler
 # -----------------------------
 variable "required_services" {
-  type    = list(string)
+  type = list(string)
   default = [
     "cloudresourcemanager.googleapis.com",
     "compute.googleapis.com",
