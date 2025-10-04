@@ -65,5 +65,5 @@ jobs:
         run: terraform plan -var-file=${{ matrix.env }}.tfvars
 
       - name: Apply (on tag only)
-        if: ${{ (matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF) && startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ (matrix.env != env.PRD_ENV_NAME || github.ref == env.MAIN_BRANCH_REF) }}
         run: terraform apply -auto-approve -var-file=${{ matrix.env }}.tfvars
