@@ -37,6 +37,11 @@ jobs:
           echo $GOOGLE_APPLICATION_CREDENTIALS
           cat $GOOGLE_APPLICATION_CREDENTIALS | jq '.client_email, .project_id'
 
+      - name: Connect to GCP
+        run: |
+          gcloud auth activate-service-account --key-file=$HOME/gcp-creds.json
+          gcloud config set project $(cat $GOOGLE_APPLICATION_CREDENTIALS | jq -r .project_id)
+
       - name: Init
         run: terraform init -backend-config=backends/${{ matrix.env }}.config
 
