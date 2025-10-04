@@ -44,10 +44,10 @@ jobs:
         run: |
           gcloud auth activate-service-account --key-file=$HOME/gcp-creds.json
           gcloud config set project $PROJECT_ID
-          
+
 
       - name: Init
-        run: terraform init -backend-config=backends/${{ matrix.env }}.config
+        run: terraform init -backend-config="./init.config"
 
       - name: Format & Validate
         run: |
