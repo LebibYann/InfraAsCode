@@ -10,9 +10,10 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    # Only include `prd` in the matrix when the run is on the main branch.
     strategy:
       matrix:
-        env: [dev, prd]
+        env: ${{ fromJson(github.ref == 'refs/heads/main' && '["dev","prd"]' || '["dev"]') }}
 
     steps:
       - uses: actions/checkout@v3
