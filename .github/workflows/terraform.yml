@@ -23,7 +23,7 @@ jobs:
       matrix:
         include:
           - env: dev
-            workload_identity_provider: projects/659049800117/locations/global/workloadIdentityPools/github-pool-ci
+            workload_identity_provider: projects/659049800117/locations/global/workloadIdentityPools/github-pool-ci/providers/github-provider
             service_account: terraform-bot-dev@infra-as-code-tek.iam.gserviceaccount.com
             project_id: infra-as-code-tek
           - env: prd
