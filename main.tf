@@ -17,15 +17,22 @@ provider "google" {
 # -----------------------------
 # Service enabler
 # -----------------------------
-resource "google_project_service" "compute" {
-  project = var.project_id
-  service = [
+variable "required_services" {
+  type    = list(string)
+  default = [
     "cloudresourcemanager.googleapis.com",
     "compute.googleapis.com",
     "storage.googleapis.com"
   ]
+}
 
-  disable_on_destroy = true # désactive l'API si tu fais terraform destroy
+resource "google_project_service" "enabled" {
+  for_each = toset(var.required_services)
+
+  project = var.project_id
+  service = each.value
+
+  disable_on_destroy = true
 }
 
 resource "google_compute_network" "gpc_vpc" {
