@@ -38,28 +38,40 @@ resource "google_project_service" "enabled" {
 # -----------------------------
 # Services
 # -----------------------------
+
+# Réseau VPC → dépend de Compute Engine
 resource "google_compute_network" "gpc_vpc" {
   name                    = "test-network"
   auto_create_subnetworks = false
 
-  depends_on = [google_project_service.enabled]
+  depends_on = [
+    google_project_service.enabled["compute.googleapis.com"]
+  ]
 }
 
+# Sous-réseau → dépend du réseau (donc transitivement de compute.googleapis.com)
 resource "google_compute_subnetwork" "subnet" {
   name          = "main-subnet"
   region        = var.region
   network       = google_compute_network.gpc_vpc.id
   ip_cidr_range = var.subnet_cidr
 
-  depends_on = [google_project_service.enabled]
+  depends_on = [
+    google_project_service.enabled["compute.googleapis.com"]
+  ]
 }
 
+# Bucket GCS → dépend de l’API Storage
 resource "google_storage_bucket" "demo" {
   name          = var.bucket_name
   location      = var.region
   force_destroy = true
 
   uniform_bucket_level_access = true
+
+  depends_on = [
+    google_project_service.enabled["storage.googleapis.com"]
+  ]
 }
 
 # -----------------------------
