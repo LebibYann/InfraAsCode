@@ -29,7 +29,7 @@ terraform destroy -var-file="dev.tfvars"
 ### 1. Ensure all these services are enabled:
 > Make sure to replace `your_gcp_project_id` with your actual GCP project ID.
 ```
-gcloud services enable iamcredentials.googleapis.com sts.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com --project your_gcp_project_id
+gcloud services enable iamcredentials.googleapis.com sts.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com serviceusage.googleapis.com --project your_gcp_project_id
 ```
 
 #### 2. Create the workload identity pool:
