@@ -172,6 +172,8 @@ resource "google_container_cluster" "main" {
   remove_default_node_pool = true
   initial_node_count       = 1
 
+  deletion_protection = false
+
   # cluster privé (nodes sans IP publique)
   private_cluster_config {
     enable_private_nodes    = true
@@ -201,8 +203,33 @@ resource "google_container_cluster" "main" {
   depends_on = [google_compute_router_nat.nat_config]
 }
 
-resource "google_container_node_pool" "default_pool" {
-  name       = "default-pool"
+resource "google_container_node_pool" "app_pool" {
+  name       = "app-pool"
+  cluster    = google_container_cluster.main.name
+  location   = var.region
+
+  node_config {
+    machine_type    = "e2-medium"
+    service_account = google_service_account.gke_nodes.email
+    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+    tags            = ["gke-default"]
+  }
+
+  autoscaling {
+    min_node_count = 1
+    max_node_count = 3
+  }
+
+  management {
+    auto_upgrade = true
+    auto_repair  = true
+  }
+
+  depends_on = [google_container_cluster.main]
+}
+
+resource "google_container_node_pool" "runners_pool" {
+  name       = "runners-pool"
   cluster    = google_container_cluster.main.name
   location   = var.region
 
