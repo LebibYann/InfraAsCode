@@ -32,7 +32,8 @@ resource "google_project_service" "enabled" {
   project = var.project_id
   service = each.value
 
-  disable_on_destroy = true
+  disable_on_destroy          = true
+  disable_dependent_services  = true
 }
 
 # -----------------------------
@@ -53,7 +54,7 @@ resource "google_compute_network" "vpc_network" {
 # Public Subnet
 # -----------------------------
 
-resource "google_compute_subnetwork" "public-subnet" {
+resource "google_compute_subnetwork" "public_subnet" {
   name          = "public-subnet"
   region        = var.region
   network       = google_compute_network.vpc_network.id
@@ -61,7 +62,7 @@ resource "google_compute_subnetwork" "public-subnet" {
   private_ip_google_access = true
 
   depends_on = [
-    google_project_service.enabled["compute.googleapis.com"]
+    google_compute_network.vpc_network
   ]
 }
 
@@ -69,7 +70,7 @@ resource "google_compute_subnetwork" "public-subnet" {
 # Private Subnet
 # -----------------------------
 
-resource "google_compute_subnetwork" "private-subnet" {
+resource "google_compute_subnetwork" "private_subnet" {
   name          = "private-subnet"
   region        = var.region
   network       = google_compute_network.vpc_network.id
@@ -77,11 +78,14 @@ resource "google_compute_subnetwork" "private-subnet" {
   private_ip_google_access = true
 
   depends_on = [
-    google_project_service.enabled["compute.googleapis.com"]
+    google_compute_network.vpc_network
   ]
 }
 
-# Bucket GCS → dépend de l’API Storage
+# -----------------------------
+# GCS Bucket
+# -----------------------------
+
 resource "google_storage_bucket" "demo" {
   name          = var.bucket_name
   location      = var.region
@@ -94,6 +98,7 @@ resource "google_storage_bucket" "demo" {
   ]
 }
 
+
 # -----------------------------
 # Outputs
 # -----------------------------
@@ -103,12 +108,12 @@ output "vpc_id" {
 }
 
 output "public_subnet_id" {
-  value       = google_compute_subnetwork.public-subnet.id
+  value       = google_compute_subnetwork.public_subnet.id
   description = "The ID of the created subnet"
 }
 
 output "private_subnet_id" {
-  value       = google_compute_subnetwork.private-subnet.id
+  value       = google_compute_subnetwork.private_subnet.id
   description = "The ID of the created subnet"
 }
 

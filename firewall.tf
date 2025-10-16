@@ -7,7 +7,7 @@ resource "google_compute_firewall" "allow_internal" {
   priority  = 1000
 
   source_ranges = ["10.0.0.0/8"]
-  allows {
+  allow {
     protocol = "all"
   }
 
@@ -24,7 +24,7 @@ resource "google_compute_firewall" "allow_http_https" {
 
   source_ranges = ["0.0.0.0/0"]
 
-  allows {
+  allow {
     protocol = "tcp"
     ports    = ["80", "443"]
   }
