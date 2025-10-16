@@ -32,16 +32,17 @@ resource "google_project_service" "enabled" {
   project = var.project_id
   service = each.value
 
-  disable_on_destroy = true
+  disable_on_destroy          = true
+  disable_dependent_services  = true
 }
 
 # -----------------------------
-# Services
+# VPC Network
 # -----------------------------
 
 # Réseau VPC → dépend de Compute Engine
-resource "google_compute_network" "gpc_vpc" {
-  name                    = "test-network"
+resource "google_compute_network" "vpc_network" {
+  name                    = "vpc-network"
   auto_create_subnetworks = false
 
   depends_on = [
@@ -49,19 +50,42 @@ resource "google_compute_network" "gpc_vpc" {
   ]
 }
 
-# Sous-réseau → dépend du réseau (donc transitivement de compute.googleapis.com)
-resource "google_compute_subnetwork" "subnet" {
-  name          = "main-subnet"
+# -----------------------------
+# Public Subnet
+# -----------------------------
+
+resource "google_compute_subnetwork" "public_subnet" {
+  name          = "public-subnet"
   region        = var.region
-  network       = google_compute_network.gpc_vpc.id
-  ip_cidr_range = var.subnet_cidr
+  network       = google_compute_network.vpc_network.id
+  ip_cidr_range = var.public_subnet_cidr
+  private_ip_google_access = true
 
   depends_on = [
-    google_project_service.enabled["compute.googleapis.com"]
+    google_compute_network.vpc_network
   ]
 }
 
-# Bucket GCS → dépend de l’API Storage
+# -----------------------------
+# Private Subnet
+# -----------------------------
+
+resource "google_compute_subnetwork" "private_subnet" {
+  name          = "private-subnet"
+  region        = var.region
+  network       = google_compute_network.vpc_network.id
+  ip_cidr_range = var.private_subnet_cidr
+  private_ip_google_access = true
+
+  depends_on = [
+    google_compute_network.vpc_network
+  ]
+}
+
+# -----------------------------
+# GCS Bucket
+# -----------------------------
+
 resource "google_storage_bucket" "demo" {
   name          = var.bucket_name
   location      = var.region
@@ -74,16 +98,22 @@ resource "google_storage_bucket" "demo" {
   ]
 }
 
+
 # -----------------------------
 # Outputs
 # -----------------------------
 output "vpc_id" {
-  value       = google_compute_network.gpc_vpc.id
+  value       = google_compute_network.vpc_network.id
   description = "The ID of the created VPC"
 }
 
-output "subnet_id" {
-  value       = google_compute_subnetwork.subnet.id
+output "public_subnet_id" {
+  value       = google_compute_subnetwork.public_subnet.id
+  description = "The ID of the created subnet"
+}
+
+output "private_subnet_id" {
+  value       = google_compute_subnetwork.private_subnet.id
   description = "The ID of the created subnet"
 }
 

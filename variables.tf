@@ -18,7 +18,12 @@ variable "network_name" {
   description = "Name of the VPC"
 }
 
-variable "subnet_cidr" {
+variable "public_subnet_cidr" {
   type        = string
-  description = "CIDR block for the subnet"
+  description = "CIDR block for the public subnet"
+}
+
+variable "private_subnet_cidr" {
+  type        = string
+  description = "CIDR block for the private subnet"
 }
