@@ -1,0 +1,8 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: iac-certificate
+  namespace: iac
+spec:
+  domains:
+  - iac.example.com
