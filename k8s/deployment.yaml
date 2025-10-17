@@ -35,4 +35,4 @@ spec:
               name: iac-secrets
               key: DB_PASS
         - name: DB_HOST
-          value: "10.30.0.5"
+          value: "10.49.176.3"
