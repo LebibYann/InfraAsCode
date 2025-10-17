@@ -4,9 +4,10 @@ metadata:
   name: iac-service
   namespace: iac
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: iac
   ports:
-  - port: 80
-    targetPort: 8080
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
