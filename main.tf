@@ -22,7 +22,7 @@ variable "required_services" {
   default = [
     "cloudresourcemanager.googleapis.com",
     "compute.googleapis.com",
-    "storage.googleapis.com"
+    "storage.googleapis.com",
   ]
 }
 
@@ -80,7 +80,41 @@ resource "google_compute_subnetwork" "private_subnet" {
   depends_on = [
     google_compute_network.vpc_network
   ]
+  secondary_ip_range {
+    range_name    = "pods-range"
+    ip_cidr_range = "10.92.0.0/14"
+  }
+
+  secondary_ip_range {
+    range_name    = "services-range"
+    ip_cidr_range = "10.96.0.0/20"
+  }
 }
+
+# -----------------------------
+# Réservation d'un IP range pour Private Services Access
+# -----------------------------
+resource "google_compute_global_address" "private_services_ip" {
+  name          = "google-managed-services"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.vpc_network.id
+}
+
+# -----------------------------
+# Peering VPC avec Google services
+# -----------------------------
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.vpc_network.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_services_ip.name]
+
+  depends_on = [
+    google_compute_global_address.private_services_ip
+  ]
+}
+
 
 # -----------------------------
 # GCS Bucket
@@ -159,4 +193,8 @@ output "private_subnet_id" {
 output "bucket_name" {
   value       = google_storage_bucket.demo.name
   description = "The name of the created GCS bucket"
+}
+
+output "private_vpc_connection_id" {
+  value = google_service_networking_connection.private_vpc_connection.id
 }

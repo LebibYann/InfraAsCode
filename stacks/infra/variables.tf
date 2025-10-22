@@ -17,4 +17,3 @@ variable "teacher_email" {
   description = "teacher GCP email"
   type        = string
 }
-
