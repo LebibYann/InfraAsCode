@@ -15,7 +15,7 @@ provider "google" {
 }
 
 # -----------------------------
-# Service enabler
+# Enable Required Services
 # -----------------------------
 variable "required_services" {
   type = list(string)
@@ -40,7 +40,6 @@ resource "google_project_service" "enabled" {
 # VPC Network
 # -----------------------------
 
-# Réseau VPC → dépend de Compute Engine
 resource "google_compute_network" "vpc_network" {
   name                    = "vpc-network"
   auto_create_subnetworks = false
@@ -92,7 +91,7 @@ resource "google_compute_subnetwork" "private_subnet" {
 }
 
 # -----------------------------
-# Réservation d'un IP range pour Private Services Access
+# Reserve IP range for Private Services Access
 # -----------------------------
 resource "google_compute_global_address" "private_services_ip" {
   name          = "google-managed-services"
@@ -103,7 +102,7 @@ resource "google_compute_global_address" "private_services_ip" {
 }
 
 # -----------------------------
-# Peering VPC avec Google services
+# VPC Peering with Google Services
 # -----------------------------
 resource "google_service_networking_connection" "private_vpc_connection" {
   network                 = google_compute_network.vpc_network.id
