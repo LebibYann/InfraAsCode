@@ -15,7 +15,7 @@ provider "google" {
 }
 
 # -----------------------------
-# Service enabler
+# Enable Required Services
 # -----------------------------
 variable "required_services" {
   type = list(string)
@@ -74,6 +74,39 @@ module "iam" {
   
   depends_on = [
     google_project_service.enabled
+  ]
+  secondary_ip_range {
+    range_name    = "pods-range"
+    ip_cidr_range = "10.92.0.0/14"
+  }
+
+  secondary_ip_range {
+    range_name    = "services-range"
+    ip_cidr_range = "10.96.0.0/20"
+  }
+}
+
+# -----------------------------
+# Reserve IP range for Private Services Access
+# -----------------------------
+resource "google_compute_global_address" "private_services_ip" {
+  name          = "google-managed-services"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.vpc_network.id
+}
+
+# -----------------------------
+# VPC Peering with Google Services
+# -----------------------------
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.vpc_network.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_services_ip.name]
+
+  depends_on = [
+    google_compute_global_address.private_services_ip
   ]
 }
 
