@@ -1,25 +1,25 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import { TEST_CONFIG } from './test-config';
 
+/**
+ * Basic smoke test to verify API is accessible
+ * More comprehensive tests are in:
+ * - unauthenticated.e2e-spec.ts
+ * - auth.e2e-spec.ts
+ * - tasks.e2e-spec.ts
+ * - edge-cases.e2e-spec.ts
+ * - load-test.e2e-spec.ts
+ */
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+  const apiUrl = TEST_CONFIG.apiUrl;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
-  });
-
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
+  it('/health (GET) - should return health status', () => {
+    return request(apiUrl)
+      .get('/health')
       .expect(200)
-      .expect('Hello World!');
+      .expect((res) => {
+        expect(res.body).toHaveProperty('status', 'ok');
+        expect(res.body).toHaveProperty('timestamp');
+      });
   });
 });

@@ -4,16 +4,16 @@ A production-ready Task Manager REST API built with NestJS, PostgreSQL, and depl
 
 ## Features
 
-✅ **RESTful CRUD API** - Full task management with title, content, due_date, and done fields  
-✅ **JWT Authentication** - Secure Bearer token authentication  
-✅ **Request Timestamp Handling** - Handles out-of-order requests using request_timestamp  
-✅ **Correlation ID Tracing** - Request tracing for debugging  
-✅ **Rate Limiting** - Throttling to prevent abuse (429 Too Many Requests)  
-✅ **Security Best Practices** - Helmet, CORS, input validation, non-root user  
-✅ **Horizontal Scaling** - Stateless design with 3+ replicas  
-✅ **PostgreSQL Database** - Managed SQL database with TypeORM  
-✅ **HTTPS/TLS** - Secure protocols via Ingress  
-✅ **Health Checks** - Liveness and readiness probes  
+✅ **RESTful CRUD API** - Full task management with title, content, due_date, and done fields
+✅ **JWT Authentication** - Secure Bearer token authentication
+✅ **Request Timestamp Handling** - Handles out-of-order requests using request_timestamp
+✅ **Correlation ID Tracing** - Request tracing for debugging
+✅ **Rate Limiting** - Throttling to prevent abuse (429 Too Many Requests)
+✅ **Security Best Practices** - Helmet, CORS, input validation, non-root user
+✅ **Horizontal Scaling** - Stateless design with 3+ replicas
+✅ **PostgreSQL Database** - Managed SQL database with TypeORM
+✅ **HTTPS/TLS** - Secure protocols via Ingress
+✅ **Health Checks** - Liveness and readiness probes
 ✅ **Kubernetes Deployment** - Helm chart with HPA, PDB, and anti-affinity
 
 ## Quick Start
@@ -68,12 +68,45 @@ $ npm run start:prod
 # unit tests
 $ npm run test
 
-# e2e tests
+# e2e tests (manual - requires running API)
 $ npm run test:e2e
+
+# e2e tests with custom URL
+$ npm run test:e2e -- --url http://localhost:3000
 
 # test coverage
 $ npm run test:cov
 ```
+
+### Comprehensive E2E Testing
+
+The project includes a complete end-to-end test suite covering:
+- ✅ Unauthenticated access (401 responses)
+- ✅ Authentication (register, login, validation)
+- ✅ All CRUD operations on tasks
+- ✅ Edge cases (race conditions, user isolation)
+- ✅ Load testing (500 concurrent requests)
+
+**Run tests with Docker (Recommended):**
+
+```bash
+# Linux/Mac - starts Docker, runs tests, cleans up
+./run-e2e-tests.sh
+
+# Windows
+run-e2e-tests.bat
+
+# With custom URL
+./run-e2e-tests.sh --url http://localhost:5000
+```
+
+The scripts automatically:
+1. Start Docker Compose services
+2. Wait for API health check
+3. Run all e2e tests
+4. Clean up Docker resources
+
+📚 See `test/README.md` for detailed testing documentation.
 
 ## Deployment
 

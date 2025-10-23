@@ -5,11 +5,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Task } from '../entities/task.entity';
 import { CreateTaskDto } from '../dto/create-task.dto';
 import { UpdateTaskDto } from '../dto/update-task.dto';
 import { DeleteTaskDto } from '../dto/delete-task.dto';
+import { GoneException } from '../common/exceptions/gone.exception';
 
 @Injectable()
 export class TasksService {
@@ -44,7 +45,7 @@ export class TasksService {
       `Fetching all tasks for user ${userId} - correlation_id: ${correlationId}`,
     );
     return await this.tasksRepository.find({
-      where: { userId },
+      where: { userId, deletedAt: IsNull() },
       order: { createdAt: 'DESC' },
     });
   }
@@ -64,6 +65,11 @@ export class TasksService {
 
     if (!task) {
       throw new NotFoundException(`Task with ID ${id} not found`);
+    }
+
+    // Check if task was soft deleted
+    if (task.deletedAt) {
+      throw new GoneException(`Task with ID ${id} is no longer available`);
     }
 
     return task;
@@ -134,6 +140,9 @@ export class TasksService {
       );
     }
 
-    await this.tasksRepository.remove(task);
+    // Soft delete: mark as deleted instead of removing from database
+    task.deletedAt = new Date();
+    task.last_request_timestamp = requestTimestamp;
+    await this.tasksRepository.save(task);
   }
 }
