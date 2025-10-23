@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: iac-config
-  namespace: iac
-data:
-  APP_ENV: "production"
-  PORT: "8080"

@@ -1,2 +1,52 @@
+# Terraform
 .terraform/
-terraform.tfstate
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Secrets
+*.tfvars.secret
+secrets.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node.js (application)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+
+# Kubernetes secrets
+kubernetes/base/secret.yaml
+kubernetes/overlays/*/secret.yaml
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+.temp/
+NEW_STRUCTURE.txt
