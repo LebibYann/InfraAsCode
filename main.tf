@@ -20,9 +20,12 @@ provider "google" {
 variable "required_services" {
   type = list(string)
   default = [
-    "cloudresourcemanager.googleapis.com",
+   "cloudresourcemanager.googleapis.com",
     "compute.googleapis.com",
     "storage.googleapis.com",
+    "container.googleapis.com",
+    "iam.googleapis.com",
+    "logging.googleapis.com"
   ]
 }
 
@@ -37,47 +40,40 @@ resource "google_project_service" "enabled" {
 }
 
 # -----------------------------
-# VPC Network
+# Modules
 # -----------------------------
 
-resource "google_compute_network" "vpc_network" {
-  name                    = "vpc-network"
-  auto_create_subnetworks = false
-
+module "network" {
+  source              = "./modules/network"
+  project_id          = var.project_id
+  region              = var.region
+  public_subnet_cidr  = var.public_subnet_cidr
+  private_subnet_cidr = var.private_subnet_cidr
+  network_name        = var.network_name
+  
   depends_on = [
-    google_project_service.enabled["compute.googleapis.com"]
+    google_project_service.enabled
   ]
 }
 
-# -----------------------------
-# Public Subnet
-# -----------------------------
-
-resource "google_compute_subnetwork" "public_subnet" {
-  name          = "public-subnet"
-  region        = var.region
-  network       = google_compute_network.vpc_network.id
-  ip_cidr_range = var.public_subnet_cidr
-  private_ip_google_access = true
-
+module "nat" {
+  source         = "./modules/nat"
+  project_id     = var.project_id
+  region         = var.region
+  network_id     = module.network.vpc_id
+  private_subnet = module.network.private_subnet_name
+  
   depends_on = [
-    google_compute_network.vpc_network
+    module.network
   ]
 }
 
-# -----------------------------
-# Private Subnet
-# -----------------------------
-
-resource "google_compute_subnetwork" "private_subnet" {
-  name          = "private-subnet"
-  region        = var.region
-  network       = google_compute_network.vpc_network.id
-  ip_cidr_range = var.private_subnet_cidr
-  private_ip_google_access = true
-
+module "iam" {
+  source     = "./modules/iam"
+  project_id = var.project_id
+  
   depends_on = [
-    google_compute_network.vpc_network
+    google_project_service.enabled
   ]
   secondary_ip_range {
     range_name    = "pods-range"
@@ -114,86 +110,27 @@ resource "google_service_networking_connection" "private_vpc_connection" {
   ]
 }
 
-
-# -----------------------------
-# GCS Bucket
-# -----------------------------
-
-resource "google_storage_bucket" "demo" {
-  name          = var.bucket_name
-  location      = var.region
-  force_destroy = true
-
-  uniform_bucket_level_access = true
-
+module "gke" {
+  source          = "./modules/gke"
+  project_id      = var.project_id
+  region          = var.region
+  network_id      = module.network.vpc_id
+  subnetwork      = module.network.private_subnet_id
+  service_account = module.iam.gke_sa_email
+  
   depends_on = [
-    google_project_service.enabled["storage.googleapis.com"]
+    module.nat,
+    module.iam,
+    google_project_service.enabled
   ]
 }
 
-# -----------------------------
-# Cloud Router
-# -----------------------------
-
-resource "google_compute_router" "nat_router" {
-  name    = "nat-router"
-  region  = var.region
-  network = google_compute_network.vpc_network.id
-
+module "storage" {
+  source      = "./modules/storage"
+  bucket_name = var.bucket_name
+  region      = var.region
+  
   depends_on = [
-    google_compute_subnetwork.private_subnet
+    google_project_service.enabled
   ]
-}
-
-# -----------------------------
-# Cloud NAT
-# -----------------------------
-
-resource "google_compute_router_nat" "nat_config" {
-  name                                = "nat-config"
-  router                              = google_compute_router.nat_router.name
-  region                              = var.region
-  nat_ip_allocate_option              = "AUTO_ONLY"
-  source_subnetwork_ip_ranges_to_nat  = "LIST_OF_SUBNETWORKS"
-
-  subnetwork {
-    name = google_compute_subnetwork.private_subnet.name
-    source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
-  }
-
-  log_config {
-    enable = true
-    filter = "ERRORS_ONLY"
-  }
-
-  depends_on = [
-    google_compute_router.nat_router
-  ]
-}
-
-# -----------------------------
-# Outputs
-# -----------------------------
-output "vpc_id" {
-  value       = google_compute_network.vpc_network.id
-  description = "The ID of the created VPC"
-}
-
-output "public_subnet_id" {
-  value       = google_compute_subnetwork.public_subnet.id
-  description = "The ID of the created subnet"
-}
-
-output "private_subnet_id" {
-  value       = google_compute_subnetwork.private_subnet.id
-  description = "The ID of the created subnet"
-}
-
-output "bucket_name" {
-  value       = google_storage_bucket.demo.name
-  description = "The name of the created GCS bucket"
-}
-
-output "private_vpc_connection_id" {
-  value = google_service_networking_connection.private_vpc_connection.id
 }

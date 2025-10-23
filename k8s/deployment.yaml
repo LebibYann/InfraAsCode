@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iac
+  namespace: iac
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: iac
+  template:
+    metadata:
+      labels:
+        app: iac
+    spec:
+      containers:
+      - name: iac
+        image: gcr.io/lenny-iac-prd/iac:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: iac-config
+              key: APP_ENV
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: iac-secrets
+              key: DB_USER
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: iac-secrets
+              key: DB_PASS
+        - name: DB_HOST
+          value: "10.49.176.3"

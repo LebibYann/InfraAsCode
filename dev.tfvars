@@ -1,6 +1,6 @@
 project_id           = "infra-as-code-tek"
 region               = "europe-west1"
-network_name         = "student-vpc"
 public_subnet_cidr   = "10.20.0.0/24"
 private_subnet_cidr  = "10.10.0.0/16"
 bucket_name          = "lenny-iac-bucket-dev"
+network_name         =  "vpc-network"
