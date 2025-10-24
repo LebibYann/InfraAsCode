@@ -1,43 +1,177 @@
-name: Terraform CI/CD
+name: Terraform Deploy
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches: ["main"]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+
+permissions:
+  id-token: write   # For OIDC
+  contents: read
 
 jobs:
-  terraform:
-    runs-on: ubuntu-latest
+  terraform-plan:
+    name: Terraform Plan (${{ matrix.env }})
+    runs-on: [self-hosted, kubernetes, gke, linux, x64]
     strategy:
       matrix:
         env: [dev, prd]
-
+      fail-fast: false
+    
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
 
-      - name: Setup GCP credentials
-        run: echo '${{ secrets["GOOGLE_CREDENTIALS_${{ matrix.env | upper }}"] }}' > $HOME/gcp-creds.json
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ matrix.env == 'dev' && 'projects/659049800117/locations/global/workloadIdentityPools/github-pool-ci/providers/github-provider-ci' || 'to_set' }}
+          service_account: ${{ matrix.env == 'dev' && 'terraform-ci-dev@infra-as-code-tek.iam.gserviceaccount.com' || 'to_set' }}
 
-      - name: Init
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
-        run: terraform init -backend-config=backends/${{ matrix.env }}.config
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ matrix.env == 'dev' && 'infra-as-code-tek' || 'lenny-iac-prd' }}
 
-      - name: Format & Validate
+      - name: Configure kubectl
         run: |
-          terraform fmt -check
-          terraform validate
+          gcloud container clusters get-credentials iac-cluster --region=europe-west1 --project=${{ matrix.env == 'dev' && 'infra-as-code-tek' || 'lenny-iac-prd' }} || echo "Cluster not found, will be created"
 
-      - name: Plan
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-creds.json
-        run: terraform plan -var-file=${{ matrix.env }}.tfvars
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: |
+          terraform init -backend-config="environments/${{ matrix.env }}/backend.tfvars" -reconfigure
 
-      - name: Apply (on tag only)
-        if: startsWith(github.ref, 'refs/tags/')
-        run: terraform apply -auto-approve -var-file=${{ matrix.env }}.tfvars
+      - name: Terraform Validate
+        working-directory: ./terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: |
+          terraform plan \
+            -var-file="environments/${{ matrix.env }}/terraform.tfvars" \
+            -out="environments/${{ matrix.env }}/output.tfplan"
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.env }}
+          path: terraform/environments/${{ matrix.env }}/output.tfplan
+          retention-days: 5
+
+  terraform-apply-dev:
+    name: Deploy to Dev
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: [self-hosted, kubernetes, gke, linux, x64]
+    environment:
+      name: dev
+      url: http://${{ steps.apply.outputs.app_url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+          terraform_wrapper: false
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/659049800117/locations/global/workloadIdentityPools/github-pool-ci/providers/github-provider-ci
+          service_account: terraform-ci-dev@infra-as-code-tek.iam.gserviceaccount.com
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: infra-as-code-tek
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials iac-cluster --region=europe-west1 --project=infra-as-code-tek || echo "Cluster not found, will be created"
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-dev
+          path: terraform/environments/dev/
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: |
+          terraform init -backend-config="environments/dev/backend.tfvars" -reconfigure
+
+      - name: Deploy Infrastructure
+        id: apply
+        working-directory: ./terraform
+        run: |
+          terraform apply "environments/dev/output.tfplan"
+          echo "app_url=$(terraform output -raw app_url)" >> $GITHUB_OUTPUT
+
+  terraform-apply-prd:
+    name: Deploy to Production
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: [self-hosted, kubernetes, gke, linux, x64]
+    environment:
+      name: prd
+      url: http://${{ steps.apply.outputs.app_url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+          terraform_wrapper: false
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: to_set
+          service_account: to_set
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: lenny-iac-prd
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials iac-cluster --region=europe-west1 --project=lenny-iac-prd || echo "Cluster not found, will be created"
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-prd
+          path: terraform/environments/prd/
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: |
+          terraform init -backend-config="environments/prd/backend.tfvars" -reconfigure
+
+      - name: Deploy Infrastructure
+        id: apply
+        working-directory: ./terraform
+        run: |
+          terraform apply "environments/prd/output.tfplan"
+          echo "app_url=$(terraform output -raw app_url)" >> $GITHUB_OUTPUT

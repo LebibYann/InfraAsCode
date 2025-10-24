@@ -1,0 +1,79 @@
+# Default values for iac chart
+# These values can be overridden via Terraform helm_release
+
+# Application image
+image:
+  repository: gcr.io/infra-as-code-tek/iac
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Number of replicas (overridden by HPA)
+replicaCount: 1
+
+# Service configuration
+service:
+  type: LoadBalancer  # Changé en LoadBalancer pour exposer directement l'app
+  port: 80
+  targetPort: 3000
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "gce"
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
+    kubernetes.io/ingress.global-static-ip-name: "iac-app-ip"
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+
+# HorizontalPodAutoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+# Resource limits
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+# Environment variables
+env:
+  PORT: "3000"
+  NODE_ENV: "production"
+  DATABASE_HOST: ""
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: ""
+  DATABASE_USER: ""
+  DATABASE_PASSWORD: ""
+
+# Health check probes
+livenessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: 3000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Namespace
+namespace: iac

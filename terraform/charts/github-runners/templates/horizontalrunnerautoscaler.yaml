@@ -1,0 +1,25 @@
+{{- if .Values.autoscaling.enabled }}
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: {{ .Values.runner.name }}-autoscaler
+  namespace: {{ .Release.Namespace }}
+spec:
+  scaleTargetRef:
+    name: {{ .Values.runner.name }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  {{- if .Values.autoscaling.scaleDownDelaySecondsAfterScaleOut }}
+  scaleDownDelaySecondsAfterScaleOut: {{ .Values.autoscaling.scaleDownDelaySecondsAfterScaleOut }}
+  {{- end }}
+  {{- if .Values.autoscaling.metrics }}
+  metrics:
+    {{- range .Values.autoscaling.metrics }}
+    - type: {{ .type }}
+      {{- if .repositoryNames }}
+      repositoryNames:
+        {{- toYaml .repositoryNames | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
