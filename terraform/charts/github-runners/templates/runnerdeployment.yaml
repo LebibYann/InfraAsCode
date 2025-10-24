@@ -1,0 +1,49 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: {{ .Values.runner.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ if .Values.autoscaling.enabled }}{{ .Values.autoscaling.minReplicas }}{{ else }}{{ .Values.runner.replicas }}{{ end }}
+  template:
+    spec:
+      repository: {{ .Values.github.repository }}
+      ephemeral: {{ .Values.runner.ephemeral }}
+      dockerEnabled: {{ .Values.runner.dockerEnabled }}
+      {{- if .Values.runner.labels }}
+      labels:
+      {{- range .Values.runner.labels }}
+        - {{ . | quote }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccount.name }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      {{- if .Values.resources }}
+      resources:
+        {{- toYaml .Values.resources | nindent 8 }}
+      {{- end }}
+      {{- if .Values.runner.dockerEnabled }}
+      dockerdContainerResources:
+        {{- toYaml .Values.dockerdContainerResources | nindent 8 }}
+      {{- end }}
+      {{- if .Values.env }}
+      env:
+        {{- toYaml .Values.env | nindent 8 }}
+      {{- end }}
+      {{- if .Values.workVolumeClaimTemplate.enabled }}
+      workVolumeClaimTemplate:
+        storageClassName: {{ .Values.workVolumeClaimTemplate.storageClassName }}
+        accessModes:
+          {{- toYaml .Values.workVolumeClaimTemplate.accessModes | nindent 10 }}
+        resources:
+          {{- toYaml .Values.workVolumeClaimTemplate.resources | nindent 10 }}
+      {{- end }}

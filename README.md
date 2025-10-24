@@ -1,51 +1,71 @@
-# 🏗️ Infrastructure as Code (IAO) - Terraform
+# 🏗️ Infrastructure as Code (IAO)
 
-Complete GCP infrastructure for deploying a containerized application with GKE, Cloud SQL, and private networking.
+Complete GCP infrastructure for deploying a NestJS application with GKE, Cloud SQL, GitHub Actions Runners, and automated CI/CD.
 
 ## 📋 Table of Contents
 
 - [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Automated Deployment](#automated-deployment)
+- [CI/CD Workflows](#cicd-workflows)
 - [Modules](#modules)
-- [IAM Stacks](#iam-stacks)
 - [Environments](#environments)
-- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
 
 ## 🏛️ Architecture
 
-The infrastructure deploys:
+The infrastructure deploys a complete production-ready stack:
 
-- **VPC Network** with public and private subnets
-- **Cloud NAT** for Internet access from private resources
-- **GKE Cluster** private with 2 node pools (app + runners)
-- **Cloud SQL PostgreSQL** with private IP
-- **Cloud Storage** for artifacts
-- **Service Accounts** with minimal permissions
-- **Firewall Rules** for security
+- **VPC Network** with public and private subnets + Cloud NAT
+- **GKE Cluster** (private) with 2 node pools:
+  - **App Pool**: 2-4 nodes e2-standard-4 (dev: 1-2)
+  - **Runners Pool**: 0-3 nodes e2-standard-4 (autoscaling)
+- **Cloud SQL PostgreSQL 15** with private IP and VPC peering
+- **GitHub Actions Runners** self-hosted on GKE
+- **Actions Runner Controller (ARC)** for runner orchestration
+- **Cert-Manager** for TLS certificate management
+- **LoadBalancer** for application ingress
+- **Secret Manager** for sensitive data
+- **Workload Identity** for secure GCP authentication
 
-See `Architecture.png` for the complete diagram.
+See `docs/Architecture.png` for the complete diagram.
 
-## ✅ Prerequisites
+## ⚡ Quick Start
 
-- [Terraform](https://www.terraform.io/downloads) >= 1.6.0
+### Prerequisites
+
+- [Terraform](https://www.terraform.io/downloads) >= 1.9.0
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install)
-- GCP account with sufficient permissions
-- GCS bucket for Terraform state
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- GCP account with Owner or Editor role
+- GitHub repository with Actions enabled
 
-### GCP Configuration
+### One-Time Setup
 
 ```bash
-# Authentication
+# 1. Authenticate with GCP
 gcloud auth application-default login
-
-# Set project
 gcloud config set project YOUR_PROJECT_ID
 
-# Create bucket for state (one time only)
-gsutil mb -l europe-west1 gs://YOUR-TERRAFORM-STATE-BUCKET
-gsutil versioning set on gs://YOUR-TERRAFORM-STATE-BUCKET
+# 2. Enable required APIs
+gcloud services enable \
+  compute.googleapis.com \
+  container.googleapis.com \
+  sqladmin.googleapis.com \
+  secretmanager.googleapis.com \
+  iam.googleapis.com
+
+# 3. Create GitHub App secrets in Secret Manager
+# For dev
+echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-dev --data-file=- --project=infra-as-code-tek
+echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-dev --data-file=- --project=infra-as-code-tek
+cat github-private-key.pem | gcloud secrets create github-private-key-dev --data-file=- --project=infra-as-code-tek
+
+# For prd
+echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-prd --data-file=- --project=lenny-iac-prd
+echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-prd --data-file=- --project=lenny-iac-prd
+cat github-private-key.pem | gcloud secrets create github-private-key-prd --data-file=- --project=lenny-iac-prd
 ```
 
 ## 📁 Project Structure
@@ -53,304 +73,355 @@ gsutil versioning set on gs://YOUR-TERRAFORM-STATE-BUCKET
 ```
 .
 ├── terraform/                   # 🔷 Terraform Infrastructure
-│   ├── main.tf                 # Main configuration
+│   ├── main.tf                 # Main orchestration
 │   ├── variables.tf            # Global variables
-│   ├── outputs.tf              # Global outputs
-│   ├── versions.tf             # Provider versions
-│   ├── README.md
+│   ├── outputs.tf              # Infrastructure outputs
+│   ├── versions.tf             # Provider configuration
+│   ├── deploy.sh               # 🚀 Automated deployment script
+│   ├── destroy.sh              # 🗑️ Safe destruction script
 │   │
-│   ├── environments/           # Environment-specific configuration
+│   ├── environments/           # Environment-specific config
 │   │   ├── dev/
-│   │   │   ├── backend.tfvars
-│   │   │   └── terraform.tfvars
+│   │   │   ├── backend.tfvars      # State backend config
+│   │   │   ├── terraform.tfvars    # Dev variables
+│   │   │   └── output.tfplan       # Generated plan
 │   │   └── prd/
 │   │       ├── backend.tfvars
-│   │       └── terraform.tfvars
+│   │       ├── terraform.tfvars
+│   │       └── output.tfplan
 │   │
-│   ├── modules/                # Reusable modules
-│   │   ├── network/           # VPC, subnets, firewalls
-│   │   ├── nat/               # Cloud NAT
-│   │   ├── gke/               # GKE cluster and node pools
-│   │   ├── cloudsql/          # Cloud SQL PostgreSQL
-│   │   ├── iam/               # Infrastructure service accounts
+│   ├── modules/                # 8 Terraform modules
+│   │   ├── cert-manager/       # TLS certificate automation
+│   │   ├── cloudsql/          # PostgreSQL database
+│   │   ├── gke/               # Kubernetes cluster + node pools
+│   │   ├── github-runners/    # Self-hosted runners + ARC
+│   │   ├── iam/               # Service accounts + RBAC
+│   │   ├── network/           # VPC + NAT + LoadBalancer
+│   │   ├── secrets/           # Secret Manager integration
 │   │   └── storage/           # Cloud Storage buckets
 │   │
+│   ├── charts/                # Helm charts
+│   │   ├── iac/               # Application chart
+│   │   └── github-runners/    # Runners chart
+│   │
 │   └── stacks/                # Isolated IAM stacks
-│       ├── iam-github/        # Permissions GitHub repository
+│       ├── iam-github/        # GitHub repo permissions
 │       └── iam-gcp/           # GCP user permissions
 │
-├── kubernetes/                 # 🔷 Kubernetes Manifests
-│   ├── base/                  # Base configuration
-│   │   ├── namespace.yaml
-│   │   ├── configmap.yaml
-│   │   ├── secret.yaml
-│   │   └── kustomization.yaml
-│   ├── overlays/              # Environment-specific overlays
-│   │   ├── dev/
-│   │   └── prd/
-│   ├── monitoring/            # Observability
-│   └── README.md
+├── .github/workflows/          # 🔷 CI/CD Automation
+│   ├── terraform.yml          # Infrastructure deployment
+│   ├── destroy.yml            # Infrastructure destruction
+│   └── terraform-destroy.yml  # Legacy destroy workflow
 │
-├── application/                # 🔷 Application NestJS
+├── application/                # 🔷 NestJS Application
 │   ├── src/
-## 🧲 Modules
+## 🚀 Automated Deployment
 
-### Network Module
-Creates the VPC, subnets, and firewall rules.
+### Using Deploy Scripts (Recommended)
 
-**Resources:**
-- VPC Network
-- Public Subnet
-- Private Subnet (with secondary IP ranges for GKE)
-- Firewall Rules
+The easiest way to deploy infrastructure:
 
-### NAT Module
-Configures Cloud NAT to allow private resources to access the Internet.
+```bash
+# Deploy to development
+./deploy.sh dev
 
-### GKE Module
-Deploys a private GKE cluster with autoscaling.
-
-**Resources:**
-- GKE Cluster (private)
-- Node Pool "app" (1-3 nodes)
-- Node Pool "runners" (0-2 nodes)
-
-### CloudSQL Module
-Creates a Cloud SQL PostgreSQL instance with private IP.
-
-**Resources:**
-- Cloud SQL Instance
-- Database
-- User
-
-### IAM Module
-Creates the service accounts for the infrastructure.
-
-### Storage Module
-Creates a Cloud Storage bucket for artifacts.
-Edit `terraform/environments/dev/terraform.tfvars`:
-
-```hcl
-project_id          = "your-gcp-project-id"
-region              = "europe-west1"
-network_name        = "vpc-network"
-public_subnet_cidr  = "10.20.0.0/24"
-private_subnet_cidr = "10.10.0.0/16"
-bucket_name         = "your-bucket-name"
-db_name             = "app_database"
-db_user             = "app_user"
-# Do not put password here, see Secrets section
+# Deploy to production
+./deploy.sh prd
 ```
 
-### 3. Initialization
+The script automatically:
+1. ✅ Validates Terraform configuration
+2. 🔄 Initializes backend with correct state
+3. 📋 Creates execution plan
+4. 🚀 Applies changes (with confirmation)
+5. 📊 Displays outputs (cluster name, app URL, etc.)
+
+### Using Destroy Scripts
+
+Safe infrastructure destruction:
+
+```bash
+# Destroy development (confirmation required)
+./destroy.sh dev
+
+# Destroy production (requires typing "destroy-production")
+./destroy.sh prd
+```
+
+### Manual Deployment
+
+If you prefer manual control:
 
 ```bash
 cd terraform/
+
+# 1. Initialize
 terraform init -backend-config=environments/dev/backend.tfvars
+
+# 2. Plan
+terraform plan -var-file=environments/dev/terraform.tfvars -out=environments/dev/output.tfplan
+
+# 3. Apply
+terraform apply environments/dev/output.tfplan
+
+# 4. Get outputs
+terraform output
 ```
 
-### 4. Planning
+## � CI/CD Workflows
 
-```bash
-# Development environment
-terraform plan -var-file=environments/dev/terraform.tfvars
+### Terraform Deployment (`terraform.yml`)
 
-# Production environment
-terraform plan -var-file=environments/prd/terraform.tfvars
-```
+Triggered on push to `main` branch:
 
-### 5. Deployment
+1. **Plan Job** (matrix: dev + prd)
+   - Runs on self-hosted GKE runners
+   - Creates Terraform plans for both environments
+   - Uploads plans as artifacts
 
-```bash
-# Dev
-terraform apply -var-file=environments/dev/terraform.tfvars
+2. **Apply Jobs** (parallel after plan)
+   - `apply-dev`: Deploys to dev (auto-approved)
+   - `apply-prd`: Deploys to prd (may require approval)
+   - Uses Workload Identity for authentication
+   - Downloads and applies corresponding plan
 
-# Production
-terraform apply -var-file=environments/prd/terraform.tfvars
-```
+### Infrastructure Destruction (`destroy.yml`)
 
-### 6. Secrets Management
+Manual workflow for safe infrastructure teardown:
 
-**Option 1: Environment variable** (recommended for dev)
-```bash
-export TF_VAR_db_password="your-secure-password"
-terraform apply -var-file=environments/dev/terraform.tfvars
-```
+1. Requires manual trigger via GitHub Actions UI
+2. Confirmation input required: "yes-destroy-infrastructure"
+3. Validates confirmation before proceeding
+4. Destroys infrastructure with proper cleanup
 
-**Option 2: Secrets file** (do not commit)
-```bash
-# Create secrets.tfvars (added to .gitignore)
-echo 'db_password = "your-secure-password"' > secrets.tfvars
+### Self-Hosted Runners
 
-# Use
-terraform apply -var-file=environments/dev/terraform.tfvars -var-file=secrets.tfvars
-```
+All workflows run on GKE-hosted runners with labels:
+- `self-hosted`
+- `kubernetes`
+- `gke`
+- `linux`
+- `x64`
+- `dev` or `prd` (environment-specific)
 
-**Option 3: Secret Manager** (recommended for production)
-- Create secret in Secret Manager
-- Uncomment code in `terraform/modules/cloudsql/main.tf`
-
- 
-
-## 🔐 IAM Stacks
-
-Permissions are managed separately in `stacks/`:
-
-### iam-github
-Manages collaborator permissions on the GitHub repository.
-
-```bash
-cd terraform/stacks/iam-github
-terraform init
-terraform apply -var-file=common.tfvars
-```
-
-### iam-gcp
-Manages user permissions on the GCP project.
-
-```bash
-cd terraform/stacks/iam-gcp
-terraform init -backend-config=init.config
-terraform apply -var-file=common.tfvars
-```
+Runner pools auto-scale from 0 to 2 (dev) or 0 to 3 (prd) nodes.
 
 ## 🌍 Environments
 
-| Environment | File        | Usage             |
-|-------------|-------------|-------------------|
-| Development | `dev.tfvars`| Tests and development |
-| Production  | `prd.tfvars`| Stable production |
+### Development (infra-as-code-tek)
+
+| Resource | Configuration |
+|----------|---------------|
+| **Project** | `infra-as-code-tek` |
+| **Region** | `europe-west1` |
+| **VPC CIDRs** | Public: `10.20.0.0/24`, Private: `10.10.0.0/16` |
+| **GKE App Pool** | 1-2 nodes, e2-standard-4 |
+| **GKE Runners Pool** | 0-2 nodes, e2-standard-2, autoscaling |
+| **Cloud SQL** | db-f1-micro, 10GB, regional HA |
+| **App Replicas** | 1 (no HPA) |
+| **Runner Labels** | `[self-hosted, kubernetes, gke, linux, x64, dev]` |
+
+### Production (lenny-iac-prd)
+
+| Resource | Configuration |
+|----------|---------------|
+| **Project** | `lenny-iac-prd` |
+| **Region** | `europe-west1` |
+| **VPC CIDRs** | Public: `10.30.0.0/24`, Private: `10.20.0.0/16` |
+| **GKE App Pool** | 2-4 nodes, e2-standard-4 |
+| **GKE Runners Pool** | 0-3 nodes, e2-standard-4, autoscaling |
+| **Cloud SQL** | db-g1-small, 10GB, regional HA |
+| **App Replicas** | 1 (no HPA) |
+| **Runner Labels** | `[self-hosted, kubernetes, gke, linux, x64, prd]` |
 
 ## 📊 Outputs
 
-After deployment, retrieve the information:
+After deployment, get infrastructure details:
 
 ```bash
 cd terraform/
 
-# Tous les outputs
+# All outputs
 terraform output
 
-# Specific output
-terraform output gke_cluster_name
+# Key outputs
+terraform output app_url              # http://<LoadBalancer-IP>/api/v1
+terraform output gke_cluster_name     # iac-cluster
 terraform output cloudsql_connection_name
+terraform output app_loadbalancer_ip
 
-# Format JSON
+# JSON format
 terraform output -json
 ```
 
-## 🛠️ Useful Commands
-
-### Terraform
+### Quick Access Commands
 
 ```bash
-cd terraform/
-
-# Formater le code
-terraform fmt -recursive
-
-# Valider la syntaxe
-terraform validate
-
-# Lister les ressources
-terraform state list
-
-# Destroy the infrastructure
-terraform destroy -var-file=environments/dev/terraform.tfvars
-```
-
-### Kubernetes
-
-```bash
-# Deploy with Kustomize
-kubectl apply -k kubernetes/overlays/dev/
-
-# Check deployments
-kubectl get all -n iac
-kubectl rollout status deployment/iac -n iac
-
-# Logs
-kubectl logs -n iac -l app=iac --tail=100 -f
-```
-
-## 🔄 Connect to the GKE Cluster
-
-```bash
-# Retrieve credentials
+# Connect to GKE cluster
 gcloud container clusters get-credentials iac-cluster \
   --region europe-west1 \
-  --project YOUR_PROJECT_ID
+  --project infra-as-code-tek  # or lenny-iac-prd
 
-# Verify the connection
-kubectl get nodes
-kubectl get pods -A
+# Check application health
+curl http://$(terraform output -raw app_loadbalancer_ip)/api/v1/health
+
+# View runner pods
+kubectl get pods -n github-runners
+
+# Check runner autoscaling
+kubectl get nodes -l workload-type=github-runners
 ```
 
-## 🗄️ Connect to Cloud SQL
+## 🧩 Modules
 
-```bash
-# Via Cloud SQL Proxy
-cloud_sql_proxy -instances=PROJECT_ID:REGION:INSTANCE_NAME=tcp:5432
+### cert-manager
+Installs cert-manager via Helm for automated TLS certificate management.
 
-# From a GKE pod (with Workload Identity)
-# See k8s/cloudsql-connection.yaml
-```
+### cloudsql
+- PostgreSQL 15 instance with private IP
+- VPC peering for secure connectivity
+- Automated backups (30 days retention)
+- Point-in-time recovery enabled
+- High availability (regional)
 
-## 📚 Best Practices
+### gke
+- Private GKE cluster (public endpoint)
+- Workload Identity enabled
+- 2 node pools: app + runners
+- Network Policy enabled
+- Shielded nodes (secure boot)
+- Auto-upgrade and auto-repair
 
-See `TERRAFORM_BEST_PRACTICES.md` for:
+### github-runners
+**Unified module combining:**
+- Actions Runner Controller (ARC) via Helm
+- Runner infrastructure and RBAC
+- Dedicated node pool with taints
+- Auto-scaling from 0 to minimize costs
+- GitHub App authentication via Secret Manager
 
-- Modular structure
-- Secrets management
-- Versioning
-- CI/CD
-- Security
-- And much more!
+### iam
+- Service accounts for GKE nodes and app
+- Workload Identity binding
+- Cloud SQL Client permissions
+- Secret Manager accessor roles
+
+### network
+**Unified module combining:**
+- VPC with public/private subnets
+- Cloud NAT for private node egress
+- Optional global HTTPS load balancer
+- Firewall rules for security
+
+### secrets
+- Secret Manager configuration
+- GitHub App credentials
+- Database passwords
+- Access policies
+
+### storage
+- Cloud Storage buckets for artifacts
+- Versioning enabled
+- Lifecycle policies
 
 ## 🐛 Troubleshooting
 
-### Error: API not enabled
+### State Lock Issues
 
 ```bash
-gcloud services enable compute.googleapis.com
-gcloud services enable container.googleapis.com
-gcloud services enable sqladmin.googleapis.com
+# If Terraform state is locked
+cd terraform/
+terraform force-unlock -force <LOCK_ID>
 ```
 
-### Error: Quota exceeded
+### Application Not Accessible
 
-Check and increase quotas in the GCP console:
-- Compute Engine API
-- Kubernetes Engine API
-
-### Error: Insufficient permissions
-
-Check your account's IAM roles:
 ```bash
-gcloud projects get-iam-policy YOUR_PROJECT_ID \
-  --flatten="bindings[].members" \
-  --filter="bindings.members:user:YOUR_EMAIL"
+# Wait for LoadBalancer IP assignment (takes 2-5 minutes)
+kubectl get svc -n iac iac-service -w
+
+# Check pod status
+kubectl get pods -n iac
+kubectl describe pod -n iac <pod-name>
+
+# View application logs
+kubectl logs -n iac -l app=iac --tail=100
 ```
+
+### Runners Not Starting
+
+```bash
+# Check ARC controller
+kubectl get pods -n actions-runner-system
+kubectl logs -n actions-runner-system -l app.kubernetes.io/name=actions-runner-controller
+
+# Check runner pods
+kubectl get pods -n github-runners
+kubectl describe pod -n github-runners <runner-pod>
+
+# Verify GitHub App secrets
+gcloud secrets versions access latest --secret=github-app-id-dev
+```
+
+### API Not Enabled
+
+```bash
+gcloud services enable \
+  compute.googleapis.com \
+  container.googleapis.com \
+  sqladmin.googleapis.com \
+  secretmanager.googleapis.com \
+  iam.googleapis.com \
+  servicenetworking.googleapis.com
+```
+
+### Workload Identity Issues
+
+```bash
+# Verify service account binding
+gcloud iam service-accounts get-iam-policy \
+  k8s-app@PROJECT_ID.iam.gserviceaccount.com
+
+# Check Kubernetes service account annotation
+kubectl describe sa iac-sa -n iac
+```
+
+For more troubleshooting guides, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+## 📚 Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Comprehensive deployment guide
+- **[terraform/README.md](terraform/README.md)** - Terraform configuration details
+- **[docs/architecture.md](docs/architecture.md)** - Architecture deep dive
+- **[docs/runbooks/](docs/runbooks/)** - Operational runbooks
+
+## 🎯 Key Features
+
+✅ **Fully Automated** - Deploy/destroy scripts with zero manual steps  
+✅ **Multi-Environment** - Dev and prd with separate configurations  
+✅ **Self-Hosted Runners** - Cost-effective GitHub Actions on GKE  
+✅ **Auto-Scaling** - Both infrastructure and application scale dynamically  
+✅ **High Availability** - Regional Cloud SQL, multiple GKE nodes  
+✅ **Security First** - Workload Identity, private networking, Secret Manager  
+✅ **Cost Optimized** - Runners scale to 0 when idle  
+✅ **Production Ready** - Monitoring, logging, health checks, and backups
 
 ## 🤝 Contributing
 
-1. Create a branch for your changes
-2. Format code: `terraform fmt -recursive`
-3. Validate: `terraform validate`
-4. Test with `dev.tfvars`
-5. Open a Pull Request
-
-## 📝 License
-
-This project is for educational use.
+1. Create a feature branch
+2. Make your changes
+3. Test on dev environment: `./deploy.sh dev`
+4. Format code: `terraform fmt -recursive`
+5. Validate: `terraform validate`
+6. Open a Pull Request
 
 ## 👥 Authors
 
-- Lenny (Linnchoeuh)
+- Lenny Vigeon ([@Linnchoeuh](https://github.com/Linnchoeuh))
 
 ## 🔗 Resources
 
 - [Terraform Documentation](https://www.terraform.io/docs)
 - [Google Cloud Terraform Provider](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
 - [GKE Best Practices](https://cloud.google.com/kubernetes-engine/docs/best-practices)
-- [Cloud SQL Best Practices](https://cloud.google.com/sql/docs/postgres/best-practices)
+- [Actions Runner Controller](https://github.com/actions/actions-runner-controller)

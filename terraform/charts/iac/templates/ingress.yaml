@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iac-ingress
+  namespace: {{ .Values.namespace }}
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.staticIpName | quote }}
+    networking.gke.io/managed-certificates: "iac-ssl-cert"
+    kubernetes.io/ingress.allow-http: "true"
+    {{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  labels:
+    app: iac
+spec:
+  rules:
+  {{- range .Values.ingress.hosts }}
+  - host: {{ .host }}
+    http:
+      paths:
+      {{- range .paths }}
+      - path: {{ .path }}
+        pathType: {{ .pathType }}
+        backend:
+          service:
+            name: iac-service
+            port:
+              number: {{ $.Values.service.port }}
+      {{- end }}
+  {{- end }}
+{{- end }}

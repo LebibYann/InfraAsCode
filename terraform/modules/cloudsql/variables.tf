@@ -14,29 +14,29 @@ variable "instance_name" {
   default     = "postgres-instance"
 }
 
-variable "database_version" {
-  type        = string
-  description = "PostgreSQL version"
-  default     = "POSTGRES_15"
-}
-
 variable "tier" {
   type        = string
   description = "Machine tier for Cloud SQL"
   default     = "db-f1-micro"
 }
 
-variable "vpc_id" {
+variable "disk_size" {
+  type        = number
+  description = "Disk size in GB for Cloud SQL instance"
+  default     = 10
+}
+
+variable "network_id" {
   type        = string
   description = "VPC network ID for private IP"
 }
 
-variable "vpc_peering_connection" {
+variable "private_vpc_connection" {
   description = "VPC peering connection dependency"
   default     = null
 }
 
-variable "db_name" {
+variable "database_name" {
   type        = string
   description = "Name of the database to create"
 }
@@ -46,19 +46,18 @@ variable "db_user" {
   description = "Database user name"
 }
 
-variable "db_password_secret_id" {
+variable "environment" {
   type        = string
-  description = "Secret Manager secret_id for the database password (e.g. cloudsql-dev-password)"
+  description = "Environment name (dev, prd, etc.)"
 }
 
-variable "db_password_secret_project" {
+variable "gke_service_account_email" {
   type        = string
-  description = "Project ID where the secret resides (defaults to current project)"
-  default     = null
+  description = "GKE service account email for secret access"
 }
 
 variable "deletion_protection" {
   type        = bool
-  description = "Enable deletion protection"
-  default     = false
+  description = "Enable deletion protection for the Cloud SQL instance"
+  default     = true
 }

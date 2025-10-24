@@ -26,3 +26,15 @@ variable "service_account" {
   type        = string
   description = "The service account email for GKE nodes"
 }
+
+variable "min_node_count" {
+  type        = number
+  description = "Minimum number of nodes in the app node pool"
+  default     = 1
+}
+
+variable "max_node_count" {
+  type        = number
+  description = "Maximum number of nodes in the app node pool"
+  default     = 3
+}

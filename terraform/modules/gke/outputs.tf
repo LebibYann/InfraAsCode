@@ -24,7 +24,7 @@ output "app_pool_name" {
   description = "The name of the app node pool"
 }
 
-output "runners_pool_name" {
-  value       = google_container_node_pool.runners_pool.name
-  description = "The name of the runners node pool"
+output "cluster_location" {
+  value       = google_container_cluster.main.location
+  description = "The location of the GKE cluster"
 }

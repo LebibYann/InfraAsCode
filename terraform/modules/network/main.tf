@@ -168,3 +168,166 @@ resource "google_compute_firewall" "deny_all_ingress" {
 
   description = "Deny all other inbound traffic"
 }
+
+# ========================================
+# Cloud NAT
+# ========================================
+
+# -----------------------------
+# Cloud Router
+# -----------------------------
+
+resource "google_compute_router" "nat_router" {
+  name    = "nat-router"
+  region  = var.region
+  network = google_compute_network.vpc_network.id
+}
+
+# -----------------------------
+# Cloud NAT Configuration
+# -----------------------------
+
+resource "google_compute_router_nat" "nat_config" {
+  name                               = "nat-config"
+  router                             = google_compute_router.nat_router.name
+  region                             = var.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
+
+  subnetwork {
+    name                    = google_compute_subnetwork.private_subnet.name
+    source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
+  }
+
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
+  }
+}
+
+# ========================================
+# Load Balancer (Optional)
+# ========================================
+
+# -----------------------------
+# Réservation d'une IP statique globale
+# -----------------------------
+
+resource "google_compute_global_address" "lb_ip" {
+  count = var.enable_load_balancer ? 1 : 0
+
+  name         = "${var.lb_name}-lb-ip"
+  address_type = "EXTERNAL"
+  ip_version   = "IPV4"
+}
+
+# -----------------------------
+# Certificat SSL managé par Google
+# -----------------------------
+
+resource "google_compute_managed_ssl_certificate" "lb_cert" {
+  count = var.enable_load_balancer && length(var.lb_domains) > 0 ? 1 : 0
+
+  name = "${var.lb_name}-ssl-cert"
+
+  managed {
+    domains = var.lb_domains
+  }
+}
+
+# -----------------------------
+# Health Check
+# -----------------------------
+
+resource "google_compute_health_check" "http_health_check" {
+  count = var.enable_load_balancer ? 1 : 0
+
+  name                = "${var.lb_name}-http-health-check"
+  check_interval_sec  = 10
+  timeout_sec         = 5
+  healthy_threshold   = 2
+  unhealthy_threshold = 3
+
+  http_health_check {
+    port         = var.lb_backend_port
+    request_path = var.lb_health_check_path
+  }
+}
+
+# -----------------------------
+# URL Map - Redirection HTTP vers HTTPS
+# -----------------------------
+
+resource "google_compute_url_map" "http_redirect" {
+  count = var.enable_load_balancer ? 1 : 0
+
+  name = "${var.lb_name}-http-redirect"
+
+  default_url_redirect {
+    https_redirect         = true
+    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+    strip_query            = false
+  }
+}
+
+# -----------------------------
+# URL Map - HTTPS
+# -----------------------------
+
+resource "google_compute_url_map" "https_lb" {
+  count = var.enable_load_balancer ? 1 : 0
+
+  name            = "${var.lb_name}-https-lb"
+  default_service = var.lb_backend_service_id
+}
+
+# -----------------------------
+# HTTP Proxy pour redirection
+# -----------------------------
+
+resource "google_compute_target_http_proxy" "http_proxy" {
+  count = var.enable_load_balancer ? 1 : 0
+
+  name    = "${var.lb_name}-http-proxy"
+  url_map = google_compute_url_map.http_redirect[0].id
+}
+
+# -----------------------------
+# HTTPS Proxy
+# -----------------------------
+
+resource "google_compute_target_https_proxy" "https_proxy" {
+  count = var.enable_load_balancer && length(var.lb_domains) > 0 ? 1 : 0
+
+  name             = "${var.lb_name}-https-proxy"
+  url_map          = google_compute_url_map.https_lb[0].id
+  ssl_certificates = [google_compute_managed_ssl_certificate.lb_cert[0].id]
+}
+
+# -----------------------------
+# Forwarding Rule HTTP (port 80) - Redirige vers HTTPS
+# -----------------------------
+
+resource "google_compute_global_forwarding_rule" "http" {
+  count = var.enable_load_balancer ? 1 : 0
+
+  name                  = "${var.lb_name}-http-forwarding-rule"
+  target                = google_compute_target_http_proxy.http_proxy[0].id
+  port_range            = "80"
+  ip_address            = google_compute_global_address.lb_ip[0].address
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+}
+
+# -----------------------------
+# Forwarding Rule HTTPS (port 443)
+# -----------------------------
+
+resource "google_compute_global_forwarding_rule" "https" {
+  count = var.enable_load_balancer && length(var.lb_domains) > 0 ? 1 : 0
+
+  name                  = "${var.lb_name}-https-forwarding-rule"
+  target                = google_compute_target_https_proxy.https_proxy[0].id
+  port_range            = "443"
+  ip_address            = google_compute_global_address.lb_ip[0].address
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+}

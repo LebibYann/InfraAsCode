@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iac
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: iac
+    app.kubernetes.io/name: iac
+    app.kubernetes.io/managed-by: helm
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: iac
+  template:
+    metadata:
+      labels:
+        app: iac
+    spec:
+      containers:
+      - name: iac
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "{{ .Values.env.PORT }}"
+        - name: NODE_ENV
+          value: "{{ .Values.env.NODE_ENV }}"
+        - name: DATABASE_HOST
+          value: "{{ .Values.env.DATABASE_HOST }}"
+        - name: DATABASE_PORT
+          value: "{{ .Values.env.DATABASE_PORT }}"
+        - name: DATABASE_NAME
+          value: "{{ .Values.env.DATABASE_NAME }}"
+        - name: DATABASE_USER
+          value: "{{ .Values.env.DATABASE_USER }}"
+        - name: DATABASE_PASSWORD
+          value: "{{ .Values.env.DATABASE_PASSWORD }}"
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.livenessProbe.httpGet.path }}
+            port: {{ .Values.livenessProbe.httpGet.port }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.readinessProbe.httpGet.path }}
+            port: {{ .Values.readinessProbe.httpGet.port }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}

@@ -26,18 +26,32 @@ resource "google_container_cluster" "main" {
     services_ipv4_cidr_block = "/20"
   }
 
-  # Active Workload Identity
-  workload_identity_config {
-    workload_pool = "${var.project_id}.svc.id.goog"
+  # Enable network policy addon
+  network_policy {
+    enabled = true
   }
 
-  node_config {
-    service_account = var.service_account
-    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+  # Enable shielded nodes for security
+  enable_shielded_nodes = true
+
+  # Release channel for auto-updates
+  release_channel {
+    channel = "REGULAR"
   }
+
+  # Note: node_config is removed because we use remove_default_node_pool = true
+  # All node configuration is done in the node pools below
 
   logging_service    = "logging.googleapis.com/kubernetes"
   monitoring_service = "monitoring.googleapis.com/kubernetes"
+
+  # Ignorer les changements sur node_config car le default pool est supprimé
+  lifecycle {
+    ignore_changes = [
+      node_config,
+      initial_node_count
+    ]
+  }
 }
 
 resource "google_container_node_pool" "app_pool" {
@@ -46,38 +60,20 @@ resource "google_container_node_pool" "app_pool" {
   location = var.region
 
   node_config {
-    machine_type    = "e2-medium"
+    machine_type    = "e2-standard-4"
     service_account = var.service_account
     oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
     tags            = ["gke-default"]
+    
+    shielded_instance_config {
+      enable_secure_boot          = true
+      enable_integrity_monitoring = true
+    }
   }
 
   autoscaling {
-    min_node_count = 1
-    max_node_count = 3
-  }
-
-  management {
-    auto_upgrade = true
-    auto_repair  = true
-  }
-}
-
-resource "google_container_node_pool" "runners_pool" {
-  name     = "runners-pool"
-  cluster  = google_container_cluster.main.name
-  location = var.region
-
-  node_config {
-    machine_type    = "e2-medium"
-    service_account = var.service_account
-    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
-    tags            = ["gke-default"]
-  }
-
-  autoscaling {
-    min_node_count = 0
-    max_node_count = 2
+    min_node_count = var.min_node_count
+    max_node_count = var.max_node_count
   }
 
   management {

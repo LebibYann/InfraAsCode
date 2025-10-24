@@ -11,10 +11,26 @@ crash.*.log
 # Secrets
 *.tfvars.secret
 secrets.tfvars
+**/secrets.tfvars
+*.tfvars.json
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Service Account Keys
+*-sa-key.json
+github-sa-key.json
+key.json
+
+# GitHub Tokens
+.github-token
+github-token.txt
+github-app-id.txt
+github-installation-id.txt
+*.private-key.pem
+github-*.pem
+/tmp/github-secrets/
 
 # Environment variables
 .env

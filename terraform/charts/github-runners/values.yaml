@@ -1,0 +1,97 @@
+# GitHub Runners Configuration using Actions Runner Controller
+
+# GitHub Configuration
+github:
+  # Repository to register runners with
+  repository: "lenny-vigeon-dev/IAC"
+  
+  # Use GitHub App authentication (recommended)
+  # These should be provided via Terraform/helm install
+  appAuth:
+    enabled: true
+    # Values will be injected by Terraform from Secret Manager
+    # appID, installationID, and privateKey are provided via --set-string
+
+# Runner Configuration
+runner:
+  # Name of the RunnerDeployment
+  name: "iac-runners"
+  
+  # Initial replica count (used when autoscaling is disabled)
+  replicas: 1
+  
+  # Runner labels for workflow targeting
+  labels:
+    - "self-hosted"
+    - "kubernetes"
+    - "gke"
+    - "linux"
+    - "x64"
+    - "dev"
+  
+  # Ephemeral runners (recommended for security)
+  ephemeral: true
+  
+  # Docker support
+  dockerEnabled: true
+
+# Autoscaling with HorizontalRunnerAutoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 0
+  maxReplicas: 2
+  # Metrics for scaling
+  metrics:
+    # Scale based on queued and in-progress workflow runs
+    - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
+  # Scale down delay (in seconds)
+  scaleDownDelaySecondsAfterScaleOut: 300
+
+# Resources for each runner pod
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"
+
+# Node selector pour forcer les runners sur le node pool dédié
+nodeSelector:
+  workload-type: "github-runners"
+
+# Tolerations pour les taints du node pool
+tolerations:
+  - key: "workload-type"
+    operator: "Equal"
+    value: "github-runners"
+    effect: "NoSchedule"
+
+# Service Account
+serviceAccount:
+  create: false
+  name: "github-runner"
+
+# Docker-in-Docker resources (when dockerEnabled: true)
+dockerdContainerResources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# Environment variables for runners
+env: []
+  # - name: HTTPS_PROXY
+  #   value: "http://proxy.example.com:8080"
+
+# Workspace volume (for runner work directory)
+workVolumeClaimTemplate:
+  enabled: true
+  storageClassName: "standard-rwo"
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "10Gi"

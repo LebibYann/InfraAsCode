@@ -1,0 +1,49 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: github-runners
+  namespace: github-runners
+spec:
+  replicas: 1
+  template:
+    spec:
+      repository: lenny-vigeon-dev/IAC  # Format: owner/repo (pas d'URL complète)
+      
+      labels:
+        - self-hosted
+        - kubernetes
+        - gke
+        - linux
+        - x64
+        - dev
+      
+      # Node selector pour forcer sur le node pool dédié
+      nodeSelector:
+        workload-type: github-runners
+      
+      # Tolerations pour les taints
+      tolerations:
+        - key: workload-type
+          operator: Equal
+          value: github-runners
+          effect: NoSchedule
+      
+      # Resources
+      resources:
+        limits:
+          cpu: "2000m"
+          memory: "2Gi"
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+      
+      # Docker-in-Docker avec sidecar
+      # Note: dockerdWithinRunnerContainer ne fonctionne que si l'image a docker preinstallé
+      # Nous utilisons dockerEnabled pour avoir un sidecar DinD
+      dockerEnabled: true
+      
+      # Runners éphémères (plus sécurisé)
+      ephemeral: true
+      
+      # Service account
+      serviceAccountName: github-runner
