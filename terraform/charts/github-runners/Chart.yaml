@@ -6,8 +6,8 @@ version: 1.0.0
 appVersion: "2.311.0"
 
 maintainers:
-  - name: IAO Team
-    email: team@iao.dev
+  - name: IAC Team
+    email: team@iac.dev
 
 keywords:
   - github

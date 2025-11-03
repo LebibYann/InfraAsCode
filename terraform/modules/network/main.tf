@@ -282,7 +282,7 @@ resource "google_compute_url_map" "https_lb" {
 }
 
 # -----------------------------
-# HTTP Proxy pour redirection
+# HTTP Proxy for redirection
 # -----------------------------
 
 resource "google_compute_target_http_proxy" "http_proxy" {
@@ -305,7 +305,7 @@ resource "google_compute_target_https_proxy" "https_proxy" {
 }
 
 # -----------------------------
-# Forwarding Rule HTTP (port 80) - Redirige vers HTTPS
+# Forwarding Rule HTTP (port 80) - Redirects to HTTPS
 # -----------------------------
 
 resource "google_compute_global_forwarding_rule" "http" {

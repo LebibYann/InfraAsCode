@@ -2,7 +2,7 @@
 # Actions Runner Controller Installation
 # ========================================
 
-# Namespace pour Actions Runner Controller
+# Namespace for Actions Runner Controller
 resource "kubernetes_namespace" "arc" {
   metadata {
     name = var.arc_namespace
@@ -12,7 +12,7 @@ resource "kubernetes_namespace" "arc" {
   }
 }
 
-# Récupérer les credentials GitHub App depuis Secret Manager
+# Retrieve GitHub App credentials from Secret Manager
 data "google_secret_manager_secret_version" "github_app_id" {
   secret  = var.github_app_id_secret
   project = var.project_id
@@ -28,7 +28,7 @@ data "google_secret_manager_secret_version" "github_app_private_key" {
   project = var.project_id
 }
 
-# Secret Kubernetes avec les credentials GitHub App
+# Kubernetes Secret with GitHub App credentials
 resource "kubernetes_secret" "controller_manager" {
   metadata {
     name      = "controller-manager"
@@ -124,7 +124,7 @@ resource "google_container_node_pool" "github_runners" {
       pool          = "runners"
     }
 
-    # Taints pour que seuls les runners s'exécutent sur ces nœuds
+    # Taints so that only runners execute on these nodes
     taint {
       key    = "workload-type"
       value  = "github-runners"
@@ -155,7 +155,7 @@ resource "google_container_node_pool" "github_runners" {
 }
 
 # -----------------------------
-# Namespace pour les GitHub Runners
+# Namespace for GitHub Runners
 # -----------------------------
 
 resource "kubernetes_namespace" "github_runners" {
@@ -248,7 +248,7 @@ resource "helm_release" "github_runners" {
 }
 
 # -----------------------------
-# ServiceAccount pour les runners
+# ServiceAccount for the runners
 # -----------------------------
 
 resource "kubernetes_service_account" "github_runner" {

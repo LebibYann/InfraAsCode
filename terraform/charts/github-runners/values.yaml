@@ -3,7 +3,7 @@
 # GitHub Configuration
 github:
   # Repository to register runners with
-  repository: "lenny-vigeon-dev/IAC"
+  repository: "your-org/your-repo"
   
   # Use GitHub App authentication (recommended)
   # These should be provided via Terraform/helm install
@@ -56,11 +56,11 @@ resources:
     cpu: "2000m"
     memory: "2Gi"
 
-# Node selector pour forcer les runners sur le node pool dédié
+# Node selector to force runners on the dedicated node pool
 nodeSelector:
   workload-type: "github-runners"
 
-# Tolerations pour les taints du node pool
+# Tolerations for the node pool taints
 tolerations:
   - key: "workload-type"
     operator: "Equal"

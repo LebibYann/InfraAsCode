@@ -23,8 +23,8 @@ resource "google_project_iam_member" "gke_node_roles" {
   for_each = toset([
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
-    "roles/artifactregistry.reader",      # Pour accéder à GCR/Artifact Registry
-    "roles/secretmanager.secretAccessor"  # Pour accéder aux secrets
+    "roles/artifactregistry.reader",      # To access GCR/Artifact Registry
+    "roles/secretmanager.secretAccessor"  # To access secrets
   ])
   project = var.project_id
   member  = "serviceAccount:${google_service_account.gke_nodes.email}"

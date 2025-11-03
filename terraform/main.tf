@@ -182,7 +182,7 @@ module "storage" {
 }
 
 # -----------------------------
-# Cert-Manager Module (requis pour ARC)
+# Cert-Manager Module (required for ARC)
 # -----------------------------
 
 module "cert_manager" {
@@ -235,7 +235,7 @@ module "github_runners" {
 }
 
 # -----------------------------
-# Namespace pour l'application
+# Namespace for the application
 # -----------------------------
 
 resource "kubernetes_namespace" "iac" {
@@ -255,7 +255,7 @@ resource "kubernetes_namespace" "iac" {
 # Helm Release - Deploy Application
 # -----------------------------
 
-# Data source pour récupérer l'IP du LoadBalancer une fois créé
+# Data source to retrieve LoadBalancer IP once created
 data "kubernetes_service" "iac_service" {
   metadata {
     name      = "iac-service"
@@ -272,7 +272,7 @@ resource "helm_release" "iac_app" {
   create_namespace = false
 
   timeout = 300  # 5 minutes
-  wait    = false  # Ne pas attendre que tous les pods soient ready
+  wait    = false  # Don't wait for all pods to be ready
   wait_for_jobs = false
   
   force_update = true

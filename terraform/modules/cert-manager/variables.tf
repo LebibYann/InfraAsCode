@@ -1,2 +1,2 @@
-# Pas de variables pour ce module
-# Cert-manager utilise une configuration standard
+# No variables for this module
+# Cert-manager uses a standard configuration

@@ -7,7 +7,7 @@ spec:
   replicas: 1
   template:
     spec:
-      repository: lenny-vigeon-dev/IAC  # Format: owner/repo (pas d'URL complète)
+      repository: your-org/your-repo  # Format: owner/repo (not full URL)
       
       labels:
         - self-hosted
@@ -17,11 +17,11 @@ spec:
         - x64
         - dev
       
-      # Node selector pour forcer sur le node pool dédié
+      # Node selector to force on the dedicated node pool
       nodeSelector:
         workload-type: github-runners
       
-      # Tolerations pour les taints
+      # Tolerations for the taints
       tolerations:
         - key: workload-type
           operator: Equal
@@ -37,12 +37,12 @@ spec:
           cpu: "500m"
           memory: "512Mi"
       
-      # Docker-in-Docker avec sidecar
-      # Note: dockerdWithinRunnerContainer ne fonctionne que si l'image a docker preinstallé
-      # Nous utilisons dockerEnabled pour avoir un sidecar DinD
+      # Docker-in-Docker with sidecar
+      # Note: dockerdWithinRunnerContainer only works if the image has docker preinstalled
+      # We use dockerEnabled to have a DinD sidecar
       dockerEnabled: true
       
-      # Runners éphémères (plus sécurisé)
+      # Ephemeral runners (more secure)
       ephemeral: true
       
       # Service account

@@ -1,0 +1,2 @@
+bucket = "your-tfstate-bucket"
+prefix = "terraform/state/prd"

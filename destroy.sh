@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ################################################################################
-# Script de destruction de l'infrastructure IAO
+# IAC Infrastructure Destroy Script
 # Usage: ./destroy.sh [dev|prd] [--auto-approve]
 ################################################################################
 
@@ -24,7 +24,7 @@ if [[ "$2" == "--auto-approve" ]]; then
 fi
 
 echo -e "${RED}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${RED}║       ⚠️  IAO Infrastructure Destroy Script  ⚠️            ║${NC}"
+echo -e "${RED}║       ⚠️  IAC Infrastructure Destroy Script  ⚠️            ║${NC}"
 echo -e "${RED}║       Environment: ${ENV^^}                                      ║${NC}"
 echo -e "${RED}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""

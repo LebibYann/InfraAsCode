@@ -5,7 +5,11 @@ variable "project_id" {
 
 variable "region" {
   type        = string
-  description = "Region for resources"
+  description =variable "github_organization" {
+  type        = string
+  description = "GitHub organization name"
+  default     = "your-org"
+}ion for resources"
 }
 
 variable "environment" {
@@ -78,8 +82,8 @@ variable "gke_max_node_count" {
 
 variable "app_image_repository" {
   type        = string
-  description = "Docker image repository for the application"
-  default     = "gcr.io/infra-as-code-tek/iac"
+  description = "GCR repository for the application image"
+  default     = "gcr.io/your-gcp-project/iac"
 }
 
 variable "app_image_tag" {
@@ -110,35 +114,35 @@ variable "app_cpu_target" {
 # GitHub Runners Configuration
 # -----------------------------
 
-# GitHub App Authentication (recommandé - secrets dans Secret Manager)
+# GitHub App Authentication (recommended - secrets in Secret Manager)
 variable "github_app_id_secret" {
   type        = string
-  description = "Nom du secret Secret Manager contenant le GitHub App ID (ex: github-app-id-dev)"
+  description = "Secret Manager secret name containing the GitHub App ID (e.g.: github-app-id-dev)"
   default     = ""
 }
 
 variable "github_installation_id_secret" {
   type        = string
-  description = "Nom du secret Secret Manager contenant le GitHub Installation ID (ex: github-installation-id-dev)"
+  description = "Secret Manager secret name containing the GitHub Installation ID (e.g.: github-installation-id-dev)"
   default     = ""
 }
 
 variable "github_private_key_secret" {
   type        = string
-  description = "Nom du secret Secret Manager contenant la GitHub App Private Key (ex: github-private-key-dev)"
+  description = "Secret Manager secret name containing the GitHub App Private Key (e.g.: github-private-key-dev)"
   default     = ""
 }
 
 variable "github_repository_url" {
   type        = string
-  description = "URL du repository ou de l'organisation GitHub (ex: https://github.com/lenny-vigeon-dev/IAC)"
-  default     = "https://github.com/lenny-vigeon-dev/IAC"
+  description = "GitHub repository or organization URL (e.g.: https://github.com/your-org/your-repo)"
+  default     = "https://github.com/your-org/your-repo"
 }
 
 variable "github_repository" {
   type        = string
-  description = "GitHub repository in format 'owner/repo' (ex: lenny-vigeon-dev/IAC)"
-  default     = "lenny-vigeon-dev/IAC"
+  description = "GitHub repository in format 'owner/repo' (e.g.: your-org/your-repo)"
+  default     = "your-org/your-repo"
 }
 
 variable "github_organization" {

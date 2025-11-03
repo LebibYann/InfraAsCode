@@ -3,7 +3,7 @@
 
 # Application image
 image:
-  repository: gcr.io/infra-as-code-tek/iac
+  repository: gcr.io/your-gcp-project/iac
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -12,7 +12,7 @@ replicaCount: 1
 
 # Service configuration
 service:
-  type: LoadBalancer  # Changé en LoadBalancer pour exposer directement l'app
+  type: LoadBalancer  # Changed to LoadBalancer to expose the app directly
   port: 80
   targetPort: 3000
 

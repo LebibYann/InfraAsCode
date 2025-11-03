@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ################################################################################
-# Script de déploiement de l'infrastructure IAO
+# IAC Infrastructure Deployment Script
 # Usage: ./deploy.sh [dev|prd] [--auto-approve]
 ################################################################################
 
@@ -24,7 +24,7 @@ if [[ "$2" == "--auto-approve" ]]; then
 fi
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║       IAO Infrastructure Deployment Script                 ║${NC}"
+echo -e "${BLUE}║       IAC Infrastructure Deployment Script                 ║${NC}"
 echo -e "${BLUE}║       Environment: ${ENV^^}                                      ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""

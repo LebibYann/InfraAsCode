@@ -18,16 +18,16 @@ resource "google_secret_manager_secret" "db_password" {
   }
 }
 
-# Note: La version du secret doit être créée manuellement ou via un script
-# Pour des raisons de sécurité, on ne stocke PAS le mot de passe en clair dans Terraform
-# Utiliser: gcloud secrets versions add cloudsql-dev-password --data-file="-"
+# Note: The secret version must be created manually or via a script
+# For security reasons, we do NOT store the password in plain text in Terraform
+# Use: gcloud secrets versions add cloudsql-dev-password --data-file="-"
 
 # -----------------------------
 # IAM Permissions for Secret Access
 # -----------------------------
 
 # Allow Cloud SQL to access the secret (via service account)
-# Note: Cloud SQL utilise un service account géré par Google, pas besoin de permissions explicites ici
+# Note: Cloud SQL uses a Google-managed service account, no explicit permissions needed here
 resource "google_secret_manager_secret_iam_member" "cloudsql_secret_access" {
   count     = var.cloudsql_service_account != "" ? 1 : 0
   secret_id = google_secret_manager_secret.db_password.id

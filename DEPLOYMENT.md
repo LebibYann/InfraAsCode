@@ -1,4 +1,4 @@
-# IAO - Infrastructure Deployment Guide
+# IAC - Infrastructure Deployment Guide
 
 ## 📋 Table des matières
 

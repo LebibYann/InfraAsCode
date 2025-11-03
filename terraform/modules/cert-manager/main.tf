@@ -1,8 +1,8 @@
 # -----------------------------
 # Cert-Manager Installation
 # -----------------------------
-# Cert-manager est requis pour Actions Runner Controller
-# Il gère les certificats TLS pour les webhooks
+# Cert-manager is required for Actions Runner Controller
+# It manages TLS certificates for webhooks
 
 resource "kubernetes_namespace" "cert_manager" {
   metadata {

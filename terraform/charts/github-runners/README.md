@@ -44,8 +44,9 @@ helm install github-runners ./github-runners \
 ```bash
 # Créer un fichier my-values.yaml
 cat > my-values.yaml <<EOF
+```yaml
 github:
-  url: "https://github.com/Linnchoeuh/IAO"
+  url: "https://github.com/your-org/your-repo"
   tokenSecret: "github-token"
 
 replicaCount: 3

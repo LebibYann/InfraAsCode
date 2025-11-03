@@ -1,4 +1,4 @@
-# 🏗️ Infrastructure as Code (IAO)
+# 🏗️ Infrastructure as Code (IAC)
 
 Complete GCP infrastructure for deploying a NestJS application with GKE, Cloud SQL, GitHub Actions Runners, and automated CI/CD.
 
@@ -6,7 +6,10 @@ Complete GCP infrastructure for deploying a NestJS application with GKE, Cloud S
 
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
+- [Projecgcloud container clusters get-credentials iac-cluster 
+  --region europe-west1 
+  --project your-gcp-project-dev  # or your-gcp-project-prd
+```tructure](#project-structure)
 - [Automated Deployment](#automated-deployment)
 - [CI/CD Workflows](#cicd-workflows)
 - [Modules](#modules)
@@ -57,15 +60,17 @@ gcloud services enable \
   iam.googleapis.com
 
 # 3. Create GitHub App secrets in Secret Manager
+```bash
 # For dev
-echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-dev --data-file=- --project=infra-as-code-tek
-echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-dev --data-file=- --project=infra-as-code-tek
-cat github-private-key.pem | gcloud secrets create github-private-key-dev --data-file=- --project=infra-as-code-tek
+echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-dev --data-file=- --project=your-gcp-project-dev
+echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-dev --data-file=- --project=your-gcp-project-dev
+cat github-private-key.pem | gcloud secrets create github-private-key-dev --data-file=- --project=your-gcp-project-dev
 
 # For prd
-echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-prd --data-file=- --project=lenny-iac-prd
-echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-prd --data-file=- --project=lenny-iac-prd
-cat github-private-key.pem | gcloud secrets create github-private-key-prd --data-file=- --project=lenny-iac-prd
+echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-prd --data-file=- --project=your-gcp-project-prd
+echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-prd --data-file=- --project=your-gcp-project-prd
+cat github-private-key.pem | gcloud secrets create github-private-key-prd --data-file=- --project=your-gcp-project-prd
+```
 ```
 
 ## 📁 Project Structure
@@ -208,11 +213,11 @@ Runner pools auto-scale from 0 to 2 (dev) or 0 to 3 (prd) nodes.
 
 ## 🌍 Environments
 
-### Development (infra-as-code-tek)
+### Development (your-gcp-project-dev)
 
 | Resource | Configuration |
 |----------|---------------|
-| **Project** | `infra-as-code-tek` |
+| **Project** | `your-gcp-project-dev` |
 | **Region** | `europe-west1` |
 | **VPC CIDRs** | Public: `10.20.0.0/24`, Private: `10.10.0.0/16` |
 | **GKE App Pool** | 1-2 nodes, e2-standard-4 |
@@ -221,11 +226,11 @@ Runner pools auto-scale from 0 to 2 (dev) or 0 to 3 (prd) nodes.
 | **App Replicas** | 1 (no HPA) |
 | **Runner Labels** | `[self-hosted, kubernetes, gke, linux, x64, dev]` |
 
-### Production (lenny-iac-prd)
+### Production (your-gcp-project-prd)
 
 | Resource | Configuration |
 |----------|---------------|
-| **Project** | `lenny-iac-prd` |
+| **Project** | `your-gcp-project-prd` |
 | **Region** | `europe-west1` |
 | **VPC CIDRs** | Public: `10.30.0.0/24`, Private: `10.20.0.0/16` |
 | **GKE App Pool** | 2-4 nodes, e2-standard-4 |
@@ -417,7 +422,7 @@ For more troubleshooting guides, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## 👥 Authors
 
-- Lenny Vigeon ([@Linnchoeuh](https://github.com/Linnchoeuh))
+- Your Team
 
 ## 🔗 Resources
 

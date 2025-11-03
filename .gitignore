@@ -8,6 +8,15 @@
 crash.log
 crash.*.log
 
+# Terraform sensitive files - DO NOT COMMIT
+**/terraform.tfvars
+**/backend.tfvars
+terraform/stacks/**/common.tfvars
+terraform/stacks/**/dev.tfvars
+terraform/stacks/**/prd.tfvars
+# Keep only example files
+!**/*.tfvars.example
+
 # Secrets
 *.tfvars.secret
 secrets.tfvars
