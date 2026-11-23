@@ -5,11 +5,9 @@ Complete GCP infrastructure for deploying a NestJS application with GKE, Cloud S
 ## 📋 Table of Contents
 
 - [Architecture](#architecture)
+- [My Contribution](#my-contribution)
 - [Quick Start](#quick-start)
-- [Projecgcloud container clusters get-credentials iac-cluster 
-  --region europe-west1 
-  --project your-gcp-project-dev  # or your-gcp-project-prd
-```tructure](#project-structure)
+- [Project Structure](#project-structure)
 - [Automated Deployment](#automated-deployment)
 - [CI/CD Workflows](#cicd-workflows)
 - [Modules](#modules)
@@ -32,7 +30,16 @@ The infrastructure deploys a complete production-ready stack:
 - **Secret Manager** for sensitive data
 - **Workload Identity** for secure GCP authentication
 
-See `docs/Architecture.png` for the complete diagram.
+![Architecture diagram](docs/Architecture.png)
+
+## 👤 My Contribution
+
+Team project (Epitech, 2025). My part:
+
+- Designed the two IAM stacks (`terraform/stacks/iam-gcp`, `terraform/stacks/iam-github`) that manage GCP and GitHub permissions as code.
+- Wrote the Terraform CI/CD workflows that plan and apply each environment from GitHub Actions.
+- Deployed self-hosted GitHub Actions runners on GKE with Actions Runner Controller, on an autoscaling node pool that scales to zero.
+- Added the security pass: `SECURITY.md`, the `check-sensitive-data.sh` pre-push check and `.tfvars.example` templates.
 
 ## ⚡ Quick Start
 
@@ -60,7 +67,6 @@ gcloud services enable \
   iam.googleapis.com
 
 # 3. Create GitHub App secrets in Secret Manager
-```bash
 # For dev
 echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-dev --data-file=- --project=your-gcp-project-dev
 echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-dev --data-file=- --project=your-gcp-project-dev
@@ -71,7 +77,8 @@ echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-prd --data-file=- --
 echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-prd --data-file=- --project=your-gcp-project-prd
 cat github-private-key.pem | gcloud secrets create github-private-key-prd --data-file=- --project=your-gcp-project-prd
 ```
-```
+
+Then copy each `*.tfvars.example` to the same name without `.example` and fill in your values. The real `.tfvars` files are git-ignored.
 
 ## 📁 Project Structure
 
@@ -173,7 +180,7 @@ terraform apply environments/dev/output.tfplan
 terraform output
 ```
 
-## � CI/CD Workflows
+## 🔄 CI/CD Workflows
 
 ### Terraform Deployment (`terraform.yml`)
 
@@ -422,7 +429,10 @@ For more troubleshooting guides, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## 👥 Authors
 
-- Your Team
+- [Yann Lebib](https://github.com/LebibYann)
+- [Lenny Vigeon](https://github.com/lenny-vigeon-dev)
+- [Linnchoeuh](https://github.com/Linnchoeuh)
+- Florent
 
 ## 🔗 Resources
 
