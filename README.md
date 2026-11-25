@@ -1,442 +1,178 @@
-# 🏗️ Infrastructure as Code (IAC)
+# Infrastructure as Code: a GKE platform on Google Cloud
 
-Complete GCP infrastructure for deploying a NestJS application with GKE, Cloud SQL, GitHub Actions Runners, and automated CI/CD.
+A Google Cloud platform described in **Terraform** and **Helm**: a private GKE cluster, a private Cloud SQL database, and **self-hosted GitHub Actions runners** that scale with the job queue on their own node pool. It hosts a small NestJS task API, used as the workload to deploy.
 
-## 📋 Table of Contents
+<p align="center">
+  <img src="docs/Architecture.png" width="900" alt="Architecture diagram: GitHub Actions authenticates to Google Cloud with OIDC, a VPC holds a load balancer, Cloud NAT, a GKE cluster with several node pools and Cloud SQL">
+  <br><em>Design diagram of the platform. The monitoring pool was designed but is not part of this code, and the CIDRs are indicative.</em>
+</p>
 
-- [Architecture](#architecture)
-- [My Contribution](#my-contribution)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Automated Deployment](#automated-deployment)
-- [CI/CD Workflows](#cicd-workflows)
-- [Modules](#modules)
-- [Environments](#environments)
-- [Troubleshooting](#troubleshooting)
+![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)
+![Google Cloud](https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
+![Helm](https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
 
-## 🏛️ Architecture
+## Features
 
-The infrastructure deploys a complete production-ready stack:
+- **Network**: VPC with public and private subnets, firewall rules, and Cloud NAT so that private nodes can reach the Internet
+- **GKE**: regional cluster with private nodes, network policy enforcement, shielded nodes, and two autoscaled node pools
+- **Runners**: Actions Runner Controller, ephemeral runners, a tainted node pool that can scale down to zero
+- **Database**: Cloud SQL for PostgreSQL 15, private IP only, regional availability, backups and point-in-time recovery
+- **Identity**: GitHub Actions authenticates to Google Cloud with OIDC (Workload Identity Federation), without a service account key
+- **Permissions as code**: two separate stacks for Google Cloud and GitHub access
+- **Two environments**, `dev` and `prd`, each with its own variables and Terraform state
 
-- **VPC Network** with public and private subnets + Cloud NAT
-- **GKE Cluster** (private) with 2 node pools:
-  - **App Pool**: 2-4 nodes e2-standard-4 (dev: 1-2)
-  - **Runners Pool**: 0-3 nodes e2-standard-4 (autoscaling)
-- **Cloud SQL PostgreSQL 15** with private IP and VPC peering
-- **GitHub Actions Runners** self-hosted on GKE
-- **Actions Runner Controller (ARC)** for runner orchestration
-- **Cert-Manager** for TLS certificate management
-- **LoadBalancer** for application ingress
-- **Secret Manager** for sensitive data
-- **Workload Identity** for secure GCP authentication
+## Architecture
 
-![Architecture diagram](docs/Architecture.png)
+```mermaid
+flowchart TB
+    Actions["GitHub Actions<br/>plan and apply"]
+    Users(["Users"])
 
-## 👤 My Contribution
+    subgraph gcp["Google Cloud project, one per environment"]
+        WIF["Workload Identity Federation"]
+        Secrets["Secret Manager<br/>database password, GitHub App"]
+        subgraph vpc["VPC"]
+            LB["Load balancer"]
+            NAT["Cloud NAT"]
+            subgraph gke["GKE cluster, private nodes"]
+                App["app-pool<br/>task API and HPA"]
+                Runners["github-runners-pool<br/>ephemeral runners"]
+                ARC["Actions Runner Controller<br/>and cert-manager"]
+            end
+        end
+        SQL[("Cloud SQL<br/>PostgreSQL 15")]
+    end
 
-Team project (Epitech, 2025). My part:
-
-- Designed the two IAM stacks (`terraform/stacks/iam-gcp`, `terraform/stacks/iam-github`) that manage GCP and GitHub permissions as code.
-- Wrote the Terraform CI/CD workflows that plan and apply each environment from GitHub Actions.
-- Deployed self-hosted GitHub Actions runners on GKE with Actions Runner Controller, on an autoscaling node pool that scales to zero.
-- Added the security pass: `SECURITY.md`, the `check-sensitive-data.sh` pre-push check and `.tfvars.example` templates.
-
-## ⚡ Quick Start
-
-### Prerequisites
-
-- [Terraform](https://www.terraform.io/downloads) >= 1.9.0
-- [gcloud CLI](https://cloud.google.com/sdk/docs/install)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- GCP account with Owner or Editor role
-- GitHub repository with Actions enabled
-
-### One-Time Setup
-
-```bash
-# 1. Authenticate with GCP
-gcloud auth application-default login
-gcloud config set project YOUR_PROJECT_ID
-
-# 2. Enable required APIs
-gcloud services enable \
-  compute.googleapis.com \
-  container.googleapis.com \
-  sqladmin.googleapis.com \
-  secretmanager.googleapis.com \
-  iam.googleapis.com
-
-# 3. Create GitHub App secrets in Secret Manager
-# For dev
-echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-dev --data-file=- --project=your-gcp-project-dev
-echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-dev --data-file=- --project=your-gcp-project-dev
-cat github-private-key.pem | gcloud secrets create github-private-key-dev --data-file=- --project=your-gcp-project-dev
-
-# For prd
-echo -n "YOUR_APP_ID" | gcloud secrets create github-app-id-prd --data-file=- --project=your-gcp-project-prd
-echo -n "YOUR_INSTALLATION_ID" | gcloud secrets create github-installation-id-prd --data-file=- --project=your-gcp-project-prd
-cat github-private-key.pem | gcloud secrets create github-private-key-prd --data-file=- --project=your-gcp-project-prd
+    Actions -->|"OIDC token"| WIF
+    Users -->|"HTTP"| LB
+    LB --> App
+    App -->|"private IP, VPC peering"| SQL
+    ARC -->|"creates"| Runners
+    Secrets -.->|"GitHub App credentials"| ARC
+    Runners --> NAT
 ```
 
-Then copy each `*.tfvars.example` to the same name without `.example` and fill in your values. The real `.tfvars` files are git-ignored.
+The runners are the part with the most moving pieces. The controller polls GitHub, adds runner pods when jobs are waiting, and the node pool grows only when those pods need a node:
 
-## 📁 Project Structure
-
-```
-.
-├── terraform/                   # 🔷 Terraform Infrastructure
-│   ├── main.tf                 # Main orchestration
-│   ├── variables.tf            # Global variables
-│   ├── outputs.tf              # Infrastructure outputs
-│   ├── versions.tf             # Provider configuration
-│   ├── deploy.sh               # 🚀 Automated deployment script
-│   ├── destroy.sh              # 🗑️ Safe destruction script
-│   │
-│   ├── environments/           # Environment-specific config
-│   │   ├── dev/
-│   │   │   ├── backend.tfvars      # State backend config
-│   │   │   ├── terraform.tfvars    # Dev variables
-│   │   │   └── output.tfplan       # Generated plan
-│   │   └── prd/
-│   │       ├── backend.tfvars
-│   │       ├── terraform.tfvars
-│   │       └── output.tfplan
-│   │
-│   ├── modules/                # 8 Terraform modules
-│   │   ├── cert-manager/       # TLS certificate automation
-│   │   ├── cloudsql/          # PostgreSQL database
-│   │   ├── gke/               # Kubernetes cluster + node pools
-│   │   ├── github-runners/    # Self-hosted runners + ARC
-│   │   ├── iam/               # Service accounts + RBAC
-│   │   ├── network/           # VPC + NAT + LoadBalancer
-│   │   ├── secrets/           # Secret Manager integration
-│   │   └── storage/           # Cloud Storage buckets
-│   │
-│   ├── charts/                # Helm charts
-│   │   ├── iac/               # Application chart
-│   │   └── github-runners/    # Runners chart
-│   │
-│   └── stacks/                # Isolated IAM stacks
-│       ├── iam-github/        # GitHub repo permissions
-│       └── iam-gcp/           # GCP user permissions
-│
-├── .github/workflows/          # 🔷 CI/CD Automation
-│   ├── terraform.yml          # Infrastructure deployment
-│   ├── destroy.yml            # Infrastructure destruction
-│   └── terraform-destroy.yml  # Legacy destroy workflow
-│
-├── application/                # 🔷 NestJS Application
-│   ├── src/
-## 🚀 Automated Deployment
-
-### Using Deploy Scripts (Recommended)
-
-The easiest way to deploy infrastructure:
-
-```bash
-# Deploy to development
-./deploy.sh dev
-
-# Deploy to production
-./deploy.sh prd
+```mermaid
+sequenceDiagram
+    participant G as GitHub
+    participant C as Runner controller
+    participant K as GKE autoscaler
+    participant R as Runner pod
+    C->>G: count queued and running jobs
+    G-->>C: one job queued
+    C->>R: create an ephemeral runner pod
+    Note over R: pending, no node in the pool
+    K->>K: add a node to github-runners-pool
+    R->>G: register and run one job
+    R-->>C: pod ends after the job
+    K->>K: remove the idle node
 ```
 
-The script automatically:
-1. ✅ Validates Terraform configuration
-2. 🔄 Initializes backend with correct state
-3. 📋 Creates execution plan
-4. 🚀 Applies changes (with confirmation)
-5. 📊 Displays outputs (cluster name, app URL, etc.)
-
-### Using Destroy Scripts
-
-Safe infrastructure destruction:
-
-```bash
-# Destroy development (confirmation required)
-./destroy.sh dev
-
-# Destroy production (requires typing "destroy-production")
-./destroy.sh prd
+```
+terraform/
+  main.tf               root module: wires every module together
+  modules/              network, gke, iam, cloudsql, storage, secrets,
+                        cert-manager, github-runners
+  charts/               Helm charts: iac (the API) and github-runners
+  environments/         dev and prd variable and backend templates
+  stacks/               iam-gcp and iam-github, applied separately
+application/            NestJS task API, Dockerfile and docker-compose.yml
+.github/workflows/      plan, apply and destroy
+docs/                   architecture notes and runbooks
+deploy.sh, destroy.sh   command-line wrappers around Terraform
 ```
 
-### Manual Deployment
+## Environments
 
-If you prefer manual control:
+Sizes come from the `terraform.tfvars.example` templates.
+
+| | dev | prd |
+|---|---|---|
+| App node pool, per zone | 1 to 2 `e2-standard-4` | 2 to 4 `e2-standard-4` |
+| Runner node pool, per zone | 0 to 2 `e2-standard-2` | 0 to 3 `e2-standard-4` |
+| Runners | 0 to 2 | 0 to 3 |
+| API replicas (HPA, 70% CPU) | 1 to 2 | 2 to 5 |
+| Cloud SQL tier | `db-f1-micro` | `db-g1-small` |
+
+## Run the API locally
+
+Requires Docker with Compose. Nothing is created on Google Cloud.
 
 ```bash
-cd terraform/
+cd application
+docker compose up --build
+curl http://localhost:3000/api/v1/health
+```
 
-# 1. Initialize
+Then, in another terminal, play the main scenario against it: `bash test-api.sh`.
+
+| Method | Route, under `/api/v1` | Action |
+|---|---|---|
+| GET | `/health` | Health check |
+| POST | `/auth/register`, `/auth/login` | Get a JWT |
+| GET, POST | `/tasks` | List or create your tasks |
+| GET, PUT, DELETE | `/tasks/:id` | Read, update or delete one task |
+
+Each write carries a `request_timestamp`. An update or a delete that is not newer than the last one applied is rejected with a 409, so that late requests do not overwrite newer data.
+
+## Deploy
+
+Requires Terraform 1.6 or later, `gcloud`, a Google Cloud project with billing, and a GitHub App for the runners. This creates paid resources.
+
+1. Copy each `*.tfvars.example` to the same name without `.example`, and fill it in. The real files are ignored by Git.
+2. Store the GitHub App ID, installation ID and private key in Secret Manager, under the names set in `terraform.tfvars`. See [SECURITY.md](SECURITY.md).
+3. Apply:
+
+```bash
+cd terraform
 terraform init -backend-config=environments/dev/backend.tfvars
-
-# 2. Plan
-terraform plan -var-file=environments/dev/terraform.tfvars -out=environments/dev/output.tfplan
-
-# 3. Apply
-terraform apply environments/dev/output.tfplan
-
-# 4. Get outputs
-terraform output
+terraform plan -var-file=environments/dev/terraform.tfvars -out=dev.tfplan
+terraform apply dev.tfplan
 ```
 
-## 🔄 CI/CD Workflows
+## Project status
 
-### Terraform Deployment (`terraform.yml`)
+This is a school project, kept as it was delivered. No live environment is provided, and the code has these known limits:
 
-Triggered on push to `main` branch:
+- `terraform/variables.tf` has a corrupted `region` variable, so `terraform init` fails
+- the workflows target the original projects, the production identity is still `to_set`, and the `.tfvars` files they read are no longer in the repository
+- Workload Identity for the API pods is not enabled; the service account exists, but its binding is commented out
+- the API chart passes the database password as a plain environment variable and does not set `JWT_SECRET`
+- traffic to the API is plain HTTP; the HTTPS load balancer of the `network` module is optional and off
+- the `request_timestamp` check is not atomic: two simultaneous updates can both be accepted
+- the API has one unit test, and its generated end-to-end test no longer matches the routes
 
-1. **Plan Job** (matrix: dev + prd)
-   - Runs on self-hosted GKE runners
-   - Creates Terraform plans for both environments
-   - Uploads plans as artifacts
+## Documentation
 
-2. **Apply Jobs** (parallel after plan)
-   - `apply-dev`: Deploys to dev (auto-approved)
-   - `apply-prd`: Deploys to prd (may require approval)
-   - Uses Workload Identity for authentication
-   - Downloads and applies corresponding plan
+- [docs/architecture.md](docs/architecture.md): architecture notes
+- [docs/runbooks/](docs/runbooks): deployment and troubleshooting
+- [terraform/README.md](terraform/README.md): Terraform configuration
+- [DEPLOYMENT.md](DEPLOYMENT.md): scripts and workflows (in French)
 
-### Infrastructure Destruction (`destroy.yml`)
+Some of these documents describe earlier stages of the project.
 
-Manual workflow for safe infrastructure teardown:
+## Team
 
-1. Requires manual trigger via GitHub Actions UI
-2. Confirmation input required: "yes-destroy-infrastructure"
-3. Validates confirmation before proceeding
-4. Destroys infrastructure with proper cleanup
+Team project of 4 at Epitech (September to November 2025):
 
-### Self-Hosted Runners
+- [Yann Lebib](https://github.com/LebibYann): network, GKE, runners, Terraform modules, task API, IAM stacks
+- [Lenny Vigeon](https://github.com/Linnchoeuh): repository setup, first Terraform resources, CI fixes and OIDC authentication
+- [Rémy, "Florent"](https://github.com/FlorentWasTaken): first Terraform base, Kubernetes manifests, scaling and alerting experiments
+- Célian Friedrich: Cloud SQL and application infrastructure in Terraform
 
-All workflows run on GKE-hosted runners with labels:
-- `self-hosted`
-- `kubernetes`
-- `gke`
-- `linux`
-- `x64`
-- `dev` or `prd` (environment-specific)
+## My contribution
 
-Runner pools auto-scale from 0 to 2 (dev) or 0 to 3 (prd) nodes.
+The commit history is kept in this repository, with some branches squashed on merge. My part, from the commits:
 
-## 🌍 Environments
-
-### Development (your-gcp-project-dev)
-
-| Resource | Configuration |
-|----------|---------------|
-| **Project** | `your-gcp-project-dev` |
-| **Region** | `europe-west1` |
-| **VPC CIDRs** | Public: `10.20.0.0/24`, Private: `10.10.0.0/16` |
-| **GKE App Pool** | 1-2 nodes, e2-standard-4 |
-| **GKE Runners Pool** | 0-2 nodes, e2-standard-2, autoscaling |
-| **Cloud SQL** | db-f1-micro, 10GB, regional HA |
-| **App Replicas** | 1 (no HPA) |
-| **Runner Labels** | `[self-hosted, kubernetes, gke, linux, x64, dev]` |
-
-### Production (your-gcp-project-prd)
-
-| Resource | Configuration |
-|----------|---------------|
-| **Project** | `your-gcp-project-prd` |
-| **Region** | `europe-west1` |
-| **VPC CIDRs** | Public: `10.30.0.0/24`, Private: `10.20.0.0/16` |
-| **GKE App Pool** | 2-4 nodes, e2-standard-4 |
-| **GKE Runners Pool** | 0-3 nodes, e2-standard-4, autoscaling |
-| **Cloud SQL** | db-g1-small, 10GB, regional HA |
-| **App Replicas** | 1 (no HPA) |
-| **Runner Labels** | `[self-hosted, kubernetes, gke, linux, x64, prd]` |
-
-## 📊 Outputs
-
-After deployment, get infrastructure details:
-
-```bash
-cd terraform/
-
-# All outputs
-terraform output
-
-# Key outputs
-terraform output app_url              # http://<LoadBalancer-IP>/api/v1
-terraform output gke_cluster_name     # iac-cluster
-terraform output cloudsql_connection_name
-terraform output app_loadbalancer_ip
-
-# JSON format
-terraform output -json
-```
-
-### Quick Access Commands
-
-```bash
-# Connect to GKE cluster
-gcloud container clusters get-credentials iac-cluster \
-  --region europe-west1 \
-  --project infra-as-code-tek  # or lenny-iac-prd
-
-# Check application health
-curl http://$(terraform output -raw app_loadbalancer_ip)/api/v1/health
-
-# View runner pods
-kubectl get pods -n github-runners
-
-# Check runner autoscaling
-kubectl get nodes -l workload-type=github-runners
-```
-
-## 🧩 Modules
-
-### cert-manager
-Installs cert-manager via Helm for automated TLS certificate management.
-
-### cloudsql
-- PostgreSQL 15 instance with private IP
-- VPC peering for secure connectivity
-- Automated backups (30 days retention)
-- Point-in-time recovery enabled
-- High availability (regional)
-
-### gke
-- Private GKE cluster (public endpoint)
-- Workload Identity enabled
-- 2 node pools: app + runners
-- Network Policy enabled
-- Shielded nodes (secure boot)
-- Auto-upgrade and auto-repair
-
-### github-runners
-**Unified module combining:**
-- Actions Runner Controller (ARC) via Helm
-- Runner infrastructure and RBAC
-- Dedicated node pool with taints
-- Auto-scaling from 0 to minimize costs
-- GitHub App authentication via Secret Manager
-
-### iam
-- Service accounts for GKE nodes and app
-- Workload Identity binding
-- Cloud SQL Client permissions
-- Secret Manager accessor roles
-
-### network
-**Unified module combining:**
-- VPC with public/private subnets
-- Cloud NAT for private node egress
-- Optional global HTTPS load balancer
-- Firewall rules for security
-
-### secrets
-- Secret Manager configuration
-- GitHub App credentials
-- Database passwords
-- Access policies
-
-### storage
-- Cloud Storage buckets for artifacts
-- Versioning enabled
-- Lifecycle policies
-
-## 🐛 Troubleshooting
-
-### State Lock Issues
-
-```bash
-# If Terraform state is locked
-cd terraform/
-terraform force-unlock -force <LOCK_ID>
-```
-
-### Application Not Accessible
-
-```bash
-# Wait for LoadBalancer IP assignment (takes 2-5 minutes)
-kubectl get svc -n iac iac-service -w
-
-# Check pod status
-kubectl get pods -n iac
-kubectl describe pod -n iac <pod-name>
-
-# View application logs
-kubectl logs -n iac -l app=iac --tail=100
-```
-
-### Runners Not Starting
-
-```bash
-# Check ARC controller
-kubectl get pods -n actions-runner-system
-kubectl logs -n actions-runner-system -l app.kubernetes.io/name=actions-runner-controller
-
-# Check runner pods
-kubectl get pods -n github-runners
-kubectl describe pod -n github-runners <runner-pod>
-
-# Verify GitHub App secrets
-gcloud secrets versions access latest --secret=github-app-id-dev
-```
-
-### API Not Enabled
-
-```bash
-gcloud services enable \
-  compute.googleapis.com \
-  container.googleapis.com \
-  sqladmin.googleapis.com \
-  secretmanager.googleapis.com \
-  iam.googleapis.com \
-  servicenetworking.googleapis.com
-```
-
-### Workload Identity Issues
-
-```bash
-# Verify service account binding
-gcloud iam service-accounts get-iam-policy \
-  k8s-app@PROJECT_ID.iam.gserviceaccount.com
-
-# Check Kubernetes service account annotation
-kubectl describe sa iac-sa -n iac
-```
-
-For more troubleshooting guides, see [`DEPLOYMENT.md`](DEPLOYMENT.md).
-
-## 📚 Documentation
-
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Comprehensive deployment guide
-- **[terraform/README.md](terraform/README.md)** - Terraform configuration details
-- **[docs/architecture.md](docs/architecture.md)** - Architecture deep dive
-- **[docs/runbooks/](docs/runbooks/)** - Operational runbooks
-
-## 🎯 Key Features
-
-✅ **Fully Automated** - Deploy/destroy scripts with zero manual steps  
-✅ **Multi-Environment** - Dev and prd with separate configurations  
-✅ **Self-Hosted Runners** - Cost-effective GitHub Actions on GKE  
-✅ **Auto-Scaling** - Both infrastructure and application scale dynamically  
-✅ **High Availability** - Regional Cloud SQL, multiple GKE nodes  
-✅ **Security First** - Workload Identity, private networking, Secret Manager  
-✅ **Cost Optimized** - Runners scale to 0 when idle  
-✅ **Production Ready** - Monitoring, logging, health checks, and backups
-
-## 🤝 Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Test on dev environment: `./deploy.sh dev`
-4. Format code: `terraform fmt -recursive`
-5. Validate: `terraform validate`
-6. Open a Pull Request
-
-## 👥 Authors
-
-- [Yann Lebib](https://github.com/LebibYann)
-- [Lenny Vigeon](https://github.com/lenny-vigeon-dev)
-- [Linnchoeuh](https://github.com/Linnchoeuh)
-- Florent
-
-## 🔗 Resources
-
-- [Terraform Documentation](https://www.terraform.io/docs)
-- [Google Cloud Terraform Provider](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
-- [GKE Best Practices](https://cloud.google.com/kubernetes-engine/docs/best-practices)
-- [Actions Runner Controller](https://github.com/actions/actions-runner-controller)
+- **Network**: public and private subnets, firewall rules, Cloud Router and Cloud NAT
+- **GKE**: cluster, service account and IAM roles, autoscaled node pools
+- **Terraform layout**: reorganisation of the project into modules and environments
+- **Runners**: Actions Runner Controller, dedicated node pool and the `github-runners` chart; Helm chart of the API
+- **CI/CD**: first Terraform workflows, then the plan, apply and destroy workflows per environment
+- **Permissions as code**: the Google Cloud and GitHub IAM stacks
+- **Application**: the NestJS task API and its Docker setup
+- **Documentation**: architecture diagram, deployment scripts and guides, configuration templates
